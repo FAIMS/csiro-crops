@@ -1,0 +1,101 @@
+<?xml version="1.0" ?>
+<module>
+
+<Login f="nodata">
+  <Login>
+    <User_ID t="dropdown" f="user">
+      <!--TODO: Must be remembered and login tabgroup skipped on subsequent
+           logins-->
+    </User_ID>
+    <Login t="button"/>
+  </Login>
+</Login>
+
+<Main f="nodata">
+  <Main>
+    <Record_Field t="button" l="Field"/>
+    <Logout t="button" l="Login"/>
+  </Main>
+  <Search>
+    <Records t="list"/>
+    <!--TODO: List of recorded archents stored in localsettings. (we'll need to
+         figure out how to do it)-->
+  </Search>
+</Main>
+
+<Field>
+  <!--TODO: This entity needs an ID-->
+  <Field>
+    <!--TODO: (no certainty on anything)-->
+    <Crop_Type>
+      <opts>
+        <opt>Wheat</opt>
+        <opt>Barley</opt>
+        <opt>Oats</opt>
+        <opt>Tricicale</opt>
+        <opt>Rye</opt>
+        <opt>Canola</opt>
+        <opt>Lupins</opt>
+        <opt>Field Peas</opt>
+        <opt>Chickpeas</opt>
+        <opt>Fababeans</opt>
+        <opt>Lentils</opt>
+        <opt>Vetch</opt>
+        <opt>Sunflower</opt>
+        <opt>Sorghum</opt>
+        <opt>Cotton</opt>
+        <opt>Rice</opt>
+        <opt>Sown legume pasture</opt>
+        <opt>Volunteer pasture</opt>
+        <opt>Other</opt>
+      </opts>
+    </Crop_Type>
+    <Year b="decimal"/>
+    <Month_of_Sowing b="date"/>
+    <Month_of_Harvest t="radio">
+      <opts>
+        <opt>March</opt>
+        <opt>April</opt>
+        <opt>May</opt>
+      </opts>
+    </Month_of_Harvest>
+    <Enterprise t="radio">
+      <opts>
+        <opt>Yes</opt>
+        <opt>No</opt>
+      </opts>
+    </Enterprise>
+    <Photo t="camera"/>
+    <Notes/>
+  </Field>
+  <Location>
+    <Record_Center_of_Paddock t="button">
+      <!--TODO: (Writes point to archent)-->
+    </Record_Center_of_Paddock>
+    <Centre f="readonly nodata">
+      <!--TODO: Write AsText Archent polygon to here-->
+    </Centre>
+    <cols>
+      <col>
+        <Record_NW_Corner_of_Paddock t="button"/>
+        <Record_NE_Corner_of_Paddock t="button"/>
+      </col>
+      <col>
+        <Record_SW_Corner_of_Paddock t="button"/>
+        <Record_SE_Corner_of_Paddock t="button"/>
+      </col>
+    </cols>
+    <cols>
+      <col>
+        <NW_Corner_of_Paddock f="nodata readonly"/>
+        <NE_Corner_of_Paddock f="nodata readonly"/>
+      </col>
+      <col>
+        <SW_Corner_of_Paddock f="nodata readonly"/>
+        <SE_Corner_of_Paddock f="nodata readonly"/>
+      </col>
+    </cols>
+  </Location>
+</Field>
+
+</module>
