@@ -7,7 +7,7 @@
       <!--TODO: Must be remembered and login tabgroup skipped on subsequent
            logins-->
     </User_ID>
-    <Login t="button"/>
+    <Login t="button" l="Main"/>
   </Login>
 </Login>
 
@@ -24,10 +24,20 @@
 </Main>
 
 <Field>
-  <!--TODO: This entity needs an ID-->
   <Field>
     <!--TODO: (no certainty on anything)-->
-    <Crop_Type>
+    <Crop_Type f="id">
+      <str>
+        <!--TODO:-->
+        <!--  BRIAN:-->
+        <!--    Crop, show annotation if not null, year-->
+        <!--    So we can do Wheat 2016-->
+        <!--    so if annotation, show it with ": annotation"-->
+        <!--{{if and($1, not($3)) then "$1 "}}{{if and($1, $3) then "$3 "}} let's see what that does-->
+        <!--basically, if there's no freetext, write vocab-->
+        <!--if there's freetext, write freetext-->
+        <fmt>{{if and($1, not($3)) then "$1 "}}{{if and($1, $3) then "$3 "}}</fmt>
+      </str>
       <opts>
         <opt>Wheat</opt>
         <opt>Barley</opt>
@@ -50,7 +60,7 @@
         <opt>Other</opt>
       </opts>
     </Crop_Type>
-    <Year b="decimal"/>
+    <Year b="decimal" f="id"/>
     <Month_of_Sowing b="date"/>
     <Month_of_Harvest t="radio">
       <opts>
@@ -97,5 +107,60 @@
     </cols>
   </Location>
 </Field>
+
+<logic>
+/**************************** USERNAME PERSISTENCE ****************************/
+/* Remembers username selected from previous session and automatically logs   */
+/* the user in with it subsequent sessions.                                   */
+/*                                                                            */
+/* Requirement source: Email, "Fwd: my contact details"                       */
+/******************************************************************************/
+  addOnEvent("Login/Login/User_ID", "load",  "tryLoadingPreviousUser()");
+  addOnEvent("Login/Login/Login",   "click", "savePreviousUser()");
+
+  tryLoadingPreviousUser() {
+    String gotoTabGroup = "Main";
+    String key = "Login/Login/User_ID";
+    String q = "SELECT value FROM localSettings WHERE key = '" + key + "';";
+
+    fetchOne(q, new FetchCallback() {
+      onFetch(result) {
+        if (!isNull(result)) {
+          String userVocabId = result.get(0);
+          selectUser(userVocabId);
+          showTabGroup(gotoTabGroup);
+        }
+      }
+    });
+  }
+
+  savePreviousUser() {
+    String key = "Login/Login/User_ID";
+    String val = getFieldValue(key);
+    insertIntoLocalSettings(key, val);
+  }
+
+  selectUser (String userVocabId) {
+    String userQ = "SELECT userid,fname,lname,email FROM user " +
+                   "WHERE  userid='" + userVocabId + "';";
+    FetchCallback callback = new FetchCallback() {
+      onFetch(result) {
+        user = new User(
+              result.get(0),
+              result.get(1),
+              result.get(2),
+              result.get(3)
+        );
+        setUser(user);
+        username = result.get(1) + " " + result.get(2);
+      }
+    };
+
+    fetchOne(userQ, callback);
+  }
+
+/******************************* READING POINTS *******************************/
+// On load, read points
+</logic>
 
 </module>
