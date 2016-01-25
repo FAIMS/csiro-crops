@@ -19,7 +19,10 @@
   <Search>
     <Records t="list"/>
     <!--TODO: List of recorded archents stored in localsettings. (we'll need to
-         figure out how to do it)-->
+         figure out how to do it)
+
+         NB: there's a pullDatabaseFromServer() function
+         -->
   </Search>
 </Main>
 
@@ -33,9 +36,9 @@
         <!--    Crop, show annotation if not null, year-->
         <!--    So we can do Wheat 2016-->
         <!--    so if annotation, show it with ": annotation"-->
-        <!--{{if and($1, not($3)) then "$1 "}}{{if and($1, $3) then "$3 "}} let's see what that does-->
-        <!--basically, if there's no freetext, write vocab-->
-        <!--if there's freetext, write freetext-->
+        <!--    {{if and($1, not($3)) then "$1 "}}{{if and($1, $3) then "$3 "}} let's see what that does-->
+        <!--    basically, if there's no freetext, write vocab-->
+        <!--    if there's freetext, write freetext-->
         <fmt>{{if and($1, not($3)) then "$1 "}}{{if and($1, $3) then "$3 "}}</fmt>
       </str>
       <opts>
@@ -79,12 +82,11 @@
     <Notes/>
   </Field>
   <Location>
-    <Record_Center_of_Paddock t="button">
+    <Record_Centre_of_Paddock t="button">
       <!--TODO: (Writes point to archent)-->
-    </Record_Center_of_Paddock>
-    <Centre f="readonly nodata">
-      <!--TODO: Write AsText Archent polygon to here-->
-    </Centre>
+    </Record_Centre_of_Paddock>
+    <Centre_of_Paddock t="input" f="readonly"/>
+    <!--HR-->
     <cols>
       <col>
         <Record_NW_Corner_of_Paddock t="button"/>
@@ -95,20 +97,13 @@
         <Record_SE_Corner_of_Paddock t="button"/>
       </col>
     </cols>
-    <cols>
-      <col>
-        <NW_Corner_of_Paddock f="nodata readonly"/>
-        <NE_Corner_of_Paddock f="nodata readonly"/>
-      </col>
-      <col>
-        <SW_Corner_of_Paddock f="nodata readonly"/>
-        <SE_Corner_of_Paddock f="nodata readonly"/>
-      </col>
-    </cols>
+    <Corners_of_Paddock t="input" f="readonly">
+      <!--TODO: Write AsText Archent polygon to here-->
+    </Corners_of_Paddock>
   </Location>
 </Field>
 
-<logic>
+<logic><![CDATA[
 /**************************** USERNAME PERSISTENCE ****************************/
 /* Remembers username selected from previous session and automatically logs   */
 /* the user in with it subsequent sessions.                                   */
@@ -159,8 +154,74 @@
     fetchOne(userQ, callback);
   }
 
-/******************************* READING POINTS *******************************/
-// On load, read points
-</logic>
+/************************ SAVING POSITIONS TO ARCHENT *************************/
+/* Requirement source: Email, "Fwd: my contact details"                       */
+/******************************************************************************/
+  String c = "click"; // I'm obsessive about an 80-character limit on line width
+  addOnEvent("Field/Location/Record_Centre_of_Paddock",    c, "saveCentre()");
+  addOnEvent("Field/Location/Record_NW_Corner_of_Paddock", c, "saveNwCorner()");
+  addOnEvent("Field/Location/Record_NE_Corner_of_Paddock", c, "saveNeCorner()");
+  addOnEvent("Field/Location/Record_SW_Corner_of_Paddock", c, "saveSwCorner()");
+  addOnEvent("Field/Location/Record_SE_Corner_of_Paddock", c, "saveSeCorner()");
+
+  MapPos centre   = null;
+  MapPos nwCorner = null;
+  MapPos neCorner = null;
+  MapPos swCorner = null;
+  MapPos seCorner = null;
+
+  makeMapPos() {
+    Object pos  = getGPSPosition();
+    Double lat  = position.getLatitude();
+    Double long = position.getLongitude();
+    MapPos pos  = new MapPos(long, lat);
+
+    return pos;
+  }
+
+  saveCentre()   { centre   = makeMapPos(); saveGeometry(); }
+  saveNwCorner() { nwCorner = makeMapPos(); saveGeometry(); }
+  saveNeCorner() { neCorner = makeMapPos(); saveGeometry(); }
+  saveSwCorner() { swCorner = makeMapPos(); saveGeometry(); }
+  saveSeCorner() { seCorner = makeMapPos(); saveGeometry(); }
+
+  saveGeometry() {
+    String refCentre  = "Field/Location/Record_Centre_of_Paddock";
+    String refCorners = "Field/Location/Corners_of_Paddock";
+
+    // Determine/set currentUuid and archEntType
+    String tabgroup    = "Field"
+    String archEntType = tabgroup.replaceAll("_", " ");
+    String currentUuid = getUuid(tabgroup);
+
+    // Make geometry---a point (centre) and a polygon (corners)
+    List mapPoses = new ArrayList();
+    mapPoses.add(nwCorner);
+    mapPoses.add(neCorner);
+    mapPoses.add(swCorner);
+    mapPoses.add(seCorner);
+
+    Point   pt   = new Point  (centre,   null, (PointStyle)   null, null);
+    Polygon pgon = New Polygon(mapPoses, null, (PolygonStyle) null, null);
+
+    // Put geometry in a list
+    ArrayList geoList = new ArrayList();
+    geoList.add(pt);
+    geoList.add(pgon);
+
+    // Prepare to save point to archEnt, then attempt to save archEnt. Upon a
+    // successful save, update the fields displayed to the user.
+    SaveCallback callback = new SaveCallback() {
+        onSave(uuid, newRecord) {
+          String msg = "[saveGeometry()] Added geometry: " + geolist;
+          print(msg);
+
+          setFieldValue(refCentre,  pt.  toString());
+          setFieldValue(refCorners, pgon.toString());
+        }
+    };
+    saveArchEnt(currentUuid, archEntType, geoList, attributes, callback);
+  }
+]]></logic>
 
 </module>
