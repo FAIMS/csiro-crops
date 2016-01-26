@@ -1,4 +1,5 @@
 <?xml version="1.0" ?>
+<!--@POSTPROC: ./postproc.sh-->
 <module>
 
 <Login f="nodata">
@@ -16,14 +17,10 @@
     <Record_Field t="button" l="Field"/>
     <Logout t="button" l="Login"/>
   </Main>
-  <Search>
-    <Records t="list"/>
+  <search>
     <!--TODO: List of recorded archents stored in localsettings. (we'll need to
-         figure out how to do it)
-
-         NB: there's a pullDatabaseFromServer() function
-         -->
-  </Search>
+         figure out how to do it)-->
+  </search>
 </Main>
 
 <Field>
@@ -86,7 +83,7 @@
       <!--TODO: (Writes point to archent)-->
     </Record_Centre_of_Paddock>
     <Centre_of_Paddock t="input" f="readonly"/>
-    <!--HR-->
+    <Hr_Tag t="webview"/>
     <cols>
       <col>
         <Record_NW_Corner_of_Paddock t="button"/>
@@ -104,6 +101,23 @@
 </Field>
 
 <logic><![CDATA[
+/******************************* LOCAL RECORDS ********************************/
+/* Keeps the list of records user-specific and improves performance.          */
+/******************************************************************************/
+  q  = "CREATE TABLE IF NOT EXISTS localRecords ";
+  q += "(uuid text primary key, value text);"
+  fetchOne(q);
+
+  // This function is set as a callback to saveTabGroup("Field") via the
+  // @POSTPROC script.
+  saveFieldCallback() {
+    String val = uuid;
+
+    g  = "REPLACE INTO localSettings(uuid, value) ";
+    g += "VALUES('" + uuid + "', '" + val + "');";
+    fetchOne(q);
+  }
+
 /**************************** USERNAME PERSISTENCE ****************************/
 /* Remembers username selected from previous session and automatically logs   */
 /* the user in with it subsequent sessions.                                   */
@@ -222,6 +236,11 @@
     };
     saveArchEnt(currentUuid, archEntType, geoList, attributes, callback);
   }
+
+/************************ DRAW A PRETTY HR TAG IN HTML ************************/
+  String ref  = "Field/Location/Hr_Tag"
+  String html = "<hr/>"
+  populateWebViewHtml(ref, html);
 ]]></logic>
 
 </module>
