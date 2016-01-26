@@ -2,16 +2,6 @@
 <!--@POSTPROC: ./postproc.sh-->
 <module>
 
-<Login f="nodata">
-  <Login>
-    <User_ID t="dropdown" f="user">
-      <!--TODO: Must be remembered and login tabgroup skipped on subsequent
-           logins-->
-    </User_ID>
-    <Login t="button" l="Main"/>
-  </Login>
-</Login>
-
 <Main f="nodata">
   <Main>
     <Record_Field t="button" l="Field"/>
@@ -23,10 +13,16 @@
   </search>
 </Main>
 
+<Login f="nodata">
+  <Login>
+    <User_ID t="dropdown" f="user"/>
+    <Login t="button" l="Main"/>
+  </Login>
+</Login>
+
 <Field>
   <Field>
-    <!--TODO: (no certainty on anything)-->
-    <Crop_Type f="id">
+    <Crop_Type f="id nocertainty">
       <str>
         <!--TODO:-->
         <!--  BRIAN:-->
@@ -60,30 +56,28 @@
         <opt>Other</opt>
       </opts>
     </Crop_Type>
-    <Year b="decimal" f="id"/>
-    <Month_of_Sowing b="date"/>
-    <Month_of_Harvest t="radio">
+    <Year b="decimal" f="id nocertainty"/>
+    <Month_of_Sowing b="date" f="nocertainty"/>
+    <Month_of_Harvest t="radio" f="nocertainty">
       <opts>
         <opt>March</opt>
         <opt>April</opt>
         <opt>May</opt>
       </opts>
     </Month_of_Harvest>
-    <Enterprise t="radio">
+    <Enterprise t="radio" f="nocertainty">
       <opts>
         <opt>Yes</opt>
         <opt>No</opt>
       </opts>
     </Enterprise>
-    <Photo t="camera"/>
-    <Notes/>
+    <Photo t="camera" f="nocertainty"/>
+    <Notes f="nocertainty"/>
   </Field>
   <Location>
-    <Record_Centre_of_Paddock t="button">
-      <!--TODO: (Writes point to archent)-->
-    </Record_Centre_of_Paddock>
-    <Centre_of_Paddock t="input" f="readonly"/>
-    <Hr_Tag t="webview"/>
+    <Record_Centre_of_Paddock t="button"/>
+    <Centre_of_Paddock t="input" f="readonly nocertainty"/>
+    <Hr_Tag t="webview" f="nolabel"/>
     <cols>
       <col>
         <Record_NW_Corner_of_Paddock t="button"/>
@@ -94,27 +88,54 @@
         <Record_SE_Corner_of_Paddock t="button"/>
       </col>
     </cols>
-    <Corners_of_Paddock t="input" f="readonly">
-      <!--TODO: Write AsText Archent polygon to here-->
-    </Corners_of_Paddock>
+    <Corners_of_Paddock t="input" f="readonly nocertainty"/>
   </Location>
 </Field>
 
 <logic><![CDATA[
 /******************************* LOCAL RECORDS ********************************/
 /* Keeps the list of records user-specific and improves performance.          */
+/*                                                                            */
+/* TODO  The search query doesn't filter results properly yet.                */
+/* TODO: Ensure that the formatString is correctly applied in search results. */
+/* TODO: Should syncing be disabled?                                          */
 /******************************************************************************/
-  q  = "CREATE TABLE IF NOT EXISTS localRecords ";
-  q += "(uuid text primary key, value text);"
+  setFileSyncEnabled(false);
+  setSyncEnabled(false);
+
+  // Create a table in the database for the user-specific records if one doesn't
+  // exist yet.
+  String q = "";
+  q += "CREATE TABLE IF NOT EXISTS localRecords ";
+  q += "(uuid text primary key, response text);";
   fetchOne(q);
 
-  // This function is set as a callback to saveTabGroup("Field") via the
-  // @POSTPROC script.
+  // The saveFieldCallback  and deleteFieldCallback functions are set as a
+  // callback to saveTabGroup("Field") and duplicateField() via the @POSTPROC
+  // script.
   saveFieldCallback() {
-    String val = uuid;
+    // Determine/set currentUuid and archEntType
+    String tabgroup    = "Field";
+    String archEntType = tabgroup.replaceAll("_", " ");
+    String currentUuid = getUuid(tabgroup);
 
-    g  = "REPLACE INTO localSettings(uuid, value) ";
-    g += "VALUES('" + uuid + "', '" + val + "');";
+    // Make and execute query to update/insert local record data
+    String val = "thing " + currentUuid;
+    q  = "REPLACE INTO localRecords(uuid, response) ";
+    q += "VALUES('" + currentUuid + "', '" + val + "');";
+    fetchOne(q);
+  }
+
+  deleteFieldCallback() {
+    // Determine/set currentUuid and archEntType
+    String tabgroup    = "Field";
+    String archEntType = tabgroup.replaceAll("_", " ");
+    String currentUuid = getUuid(tabgroup);
+
+    // Make and execute deletion query
+    String q = "";
+    q += "DELETE FROM localRecords ";
+    q += "WHERE uuid='" + currentUuid + "';";
     fetchOne(q);
   }
 
@@ -124,21 +145,27 @@
 /*                                                                            */
 /* Requirement source: Email, "Fwd: my contact details"                       */
 /******************************************************************************/
-  addOnEvent("Login/Login/User_ID", "load",  "tryLoadingPreviousUser()");
-  addOnEvent("Login/Login/Login",   "click", "savePreviousUser()");
+  addOnEvent("Main",              "load",  "acquireUser()");
+  addOnEvent("Login/Login/Login", "click", "savePreviousUser()");
 
-  tryLoadingPreviousUser() {
-    String gotoTabGroup = "Main";
+  // Load the last user from localSettings if it exists. Otherwise, redirect the
+  // user to the Login tab group.
+  acquireUser() {
+    String gotoTabGroup = "Login";
     String key = "Login/Login/User_ID";
     String q = "SELECT value FROM localSettings WHERE key = '" + key + "';";
 
+    dialog = showBusy("Loading module", "please wait...");
     fetchOne(q, new FetchCallback() {
       onFetch(result) {
-        if (!isNull(result)) {
+        if (isNull(result)) {
+          showTabGroup(gotoTabGroup);
+        } else {
           String userVocabId = result.get(0);
           selectUser(userVocabId);
-          showTabGroup(gotoTabGroup);
         }
+
+        dialog.dismiss();
       }
     });
   }
@@ -185,10 +212,17 @@
   MapPos seCorner = null;
 
   makeMapPos() {
-    Object pos  = getGPSPosition();
-    Double lat  = position.getLatitude();
-    Double long = position.getLongitude();
-    MapPos pos  = new MapPos(long, lat);
+    String msg = "No GPS signal is present.";
+
+    Object pos = getGPSPosition();
+    if (pos == null) {
+      showToast(msg);
+      return null;
+    }
+
+    Double lat = pos.getLatitude();
+    Double lon = pos.getLongitude();
+    MapPos pos = new MapPos(lon, lat);
 
     return pos;
   }
@@ -200,11 +234,11 @@
   saveSeCorner() { seCorner = makeMapPos(); saveGeometry(); }
 
   saveGeometry() {
-    String refCentre  = "Field/Location/Record_Centre_of_Paddock";
+    String refCentre  = "Field/Location/Centre_of_Paddock";
     String refCorners = "Field/Location/Corners_of_Paddock";
 
     // Determine/set currentUuid and archEntType
-    String tabgroup    = "Field"
+    String tabgroup    = "Field";
     String archEntType = tabgroup.replaceAll("_", " ");
     String currentUuid = getUuid(tabgroup);
 
@@ -216,7 +250,7 @@
     mapPoses.add(seCorner);
 
     Point   pt   = new Point  (centre,   null, (PointStyle)   null, null);
-    Polygon pgon = New Polygon(mapPoses, null, (PolygonStyle) null, null);
+    Polygon pgon = new Polygon(mapPoses, null, (PolygonStyle) null, null);
 
     // Put geometry in a list
     ArrayList geoList = new ArrayList();
@@ -231,15 +265,18 @@
           print(msg);
 
           setFieldValue(refCentre,  pt.  toString());
+          // TODO under what conditions should the points be written? pgons
+          // require at least three vertices. And putting in null MapPos objects
+          // causes toString() to fail.
           setFieldValue(refCorners, pgon.toString());
         }
     };
-    saveArchEnt(currentUuid, archEntType, geoList, attributes, callback);
+    saveArchEnt(currentUuid, archEntType, geoList, null, callback);
   }
 
 /************************ DRAW A PRETTY HR TAG IN HTML ************************/
-  String ref  = "Field/Location/Hr_Tag"
-  String html = "<hr/>"
+  String ref  = "Field/Location/Hr_Tag";
+  String html = "<hr/>";
   populateWebViewHtml(ref, html);
 ]]></logic>
 
