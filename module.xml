@@ -8,14 +8,18 @@
     <Logout t="button" l="Login"/>
   </Main>
   <search>
-    <!--TODO: List of recorded archents stored in localsettings. (we'll need to
-         figure out how to do it)-->
+    <!--Searching has been modified to include only local records using a-->
+    <!--combination of code in this file (ctrl+f: "LOCAL RECORDS") and-->
+    <!--@POSTPROC.-->
   </search>
 </Main>
 
 <Login f="nodata">
   <Login>
-    <User_ID t="dropdown" f="user"/>
+    <User_ID t="dropdown" f="user">
+      <!--Users are disallowed from logging in with a blank dropdown via-->
+      <!--@POSTPROC.-->
+    </User_ID>
     <Login t="button" l="Main"/>
   </Login>
 </Login>
@@ -88,7 +92,7 @@
         <Record_SE_Corner_of_Paddock t="button"/>
       </col>
     </cols>
-    <Corners_of_Paddock t="input" f="readonly nocertainty"/>
+    <Corners_of_Paddock t="input" b="string" f="readonly nocertainty"/>
   </Location>
 </Field>
 
@@ -96,21 +100,17 @@
 /******************************* LOCAL RECORDS ********************************/
 /* Keeps the list of records user-specific and improves performance.          */
 /*                                                                            */
-/* TODO  The search query doesn't filter results properly yet.                */
+/* TODO: The search query doesn't filter results properly yet.                */
 /* TODO: Ensure that the formatString is correctly applied in search results. */
-/* TODO: Should syncing be disabled?                                          */
 /******************************************************************************/
-  setFileSyncEnabled(false);
-  setSyncEnabled(false);
-
   // Create a table in the database for the user-specific records if one doesn't
   // exist yet.
   String q = "";
-  q += "CREATE TABLE IF NOT EXISTS localRecords ";
+  q += "CREATE TABLE IF NOT EXISTS localRecord ";
   q += "(uuid text primary key, response text);";
   fetchOne(q);
 
-  // The saveFieldCallback  and deleteFieldCallback functions are set as a
+  // The saveFieldCallback and deleteFieldCallback functions are set as a
   // callback to saveTabGroup("Field") and duplicateField() via the @POSTPROC
   // script.
   saveFieldCallback() {
@@ -120,9 +120,12 @@
     String currentUuid = getUuid(tabgroup);
 
     // Make and execute query to update/insert local record data
-    String val = "thing " + currentUuid;
-    q  = "REPLACE INTO localRecords(uuid, response) ";
-    q += "VALUES('" + currentUuid + "', '" + val + "');";
+    String q = "";
+    q += "REPLACE INTO localRecord(uuid, response) ";
+    q += "  SELECT uuid, response ";
+    q += "  FROM latestNonDeletedArchEntFormattedIdentifiers ";
+    q += "  WHERE uuid = '%s'; ";
+    q  = q.replaceFirst("%s", currentUuid);
     fetchOne(q);
   }
 
@@ -134,14 +137,17 @@
 
     // Make and execute deletion query
     String q = "";
-    q += "DELETE FROM localRecords ";
-    q += "WHERE uuid='" + currentUuid + "';";
+    q += "DELETE FROM localRecord ";
+    q += "WHERE uuid='%s';";
+    q  = q.replaceFirst("%s", currentUuid);
     fetchOne(q);
   }
 
 /**************************** USERNAME PERSISTENCE ****************************/
 /* Remembers username selected from previous session and automatically logs   */
 /* the user in with it subsequent sessions.                                   */
+/*                                                                            */
+/* TODO: Check for two or more users that their search results are unique.    */
 /*                                                                            */
 /* Requirement source: Email, "Fwd: my contact details"                       */
 /******************************************************************************/
@@ -155,6 +161,7 @@
     String key = "Login/Login/User_ID";
     String q = "SELECT value FROM localSettings WHERE key = '" + key + "';";
 
+    // `dialog` is a global defined by the autogenerator
     dialog = showBusy("Loading module", "please wait...");
     fetchOne(q, new FetchCallback() {
       onFetch(result) {
@@ -205,35 +212,61 @@
   addOnEvent("Field/Location/Record_SW_Corner_of_Paddock", c, "saveSwCorner()");
   addOnEvent("Field/Location/Record_SE_Corner_of_Paddock", c, "saveSeCorner()");
 
-  MapPos centre   = null;
-  MapPos nwCorner = null;
-  MapPos neCorner = null;
-  MapPos swCorner = null;
-  MapPos seCorner = null;
+  addOnEvent("Main", "show", "initialiseGeometry()");
+
+  initialiseGeometry() {
+    global.centre   = null;
+    global.nwCorner = null;
+    global.neCorner = null;
+    global.swCorner = null;
+    global.seCorner = null;
+  }
 
   makeMapPos() {
-    String msg = "No GPS signal is present.";
+    String msgSuccess = "Point taken";
+    String msgFail    = "No GPS signal is present";
 
     Object pos = getGPSPosition();
     if (pos == null) {
-      showToast(msg);
+      showToast(msgFail);
       return null;
     }
 
     Double lat = pos.getLatitude();
     Double lon = pos.getLongitude();
-    MapPos pos = new MapPos(lon, lat);
+    MapPos mapPos = new MapPos(lon, lat);
 
-    return pos;
+    showToast(msgSuccess);
+    return mapPos;
   }
 
-  saveCentre()   { centre   = makeMapPos(); saveGeometry(); }
-  saveNwCorner() { nwCorner = makeMapPos(); saveGeometry(); }
-  saveNeCorner() { neCorner = makeMapPos(); saveGeometry(); }
-  saveSwCorner() { swCorner = makeMapPos(); saveGeometry(); }
-  saveSeCorner() { seCorner = makeMapPos(); saveGeometry(); }
+  saveCentre()   { centre   = makeMapPos(); saveGeometry("point"); }
+  saveNwCorner() { nwCorner = makeMapPos(); saveGeometry("poly"); }
+  saveNeCorner() { neCorner = makeMapPos(); saveGeometry("poly"); }
+  saveSwCorner() { swCorner = makeMapPos(); saveGeometry("poly"); }
+  saveSeCorner() { seCorner = makeMapPos(); saveGeometry("poly"); }
 
-  saveGeometry() {
+  saveGeometry(String geoType) {
+    if (!geoType.equals("point") && !geoType.equals("poly")) {
+      throw new Error();
+    }
+
+    // Check if the point and/or the polygon will be savable
+    Boolean doSavePoint = true;
+    Boolean doSavePoly  = true;
+    doSavePoint = doSavePoint && (centre   != null);
+    doSavePoly  = doSavePoly  && (nwCorner != null);
+    doSavePoly  = doSavePoly  && (neCorner != null);
+    doSavePoly  = doSavePoly  && (swCorner != null);
+    doSavePoly  = doSavePoly  && (seCorner != null);
+
+    if (geoType.equals("point") && !doSavePoint) return;
+    if (geoType.equals("poly")  && !doSavePoly)  return;
+
+    // Cheery message to show user once the entity is saved
+    String msgSuccess = "Geometry saved";
+
+    // Some references we might need to modify
     String refCentre  = "Field/Location/Centre_of_Paddock";
     String refCorners = "Field/Location/Corners_of_Paddock";
 
@@ -249,26 +282,28 @@
     mapPoses.add(swCorner);
     mapPoses.add(seCorner);
 
-    Point   pt   = new Point  (centre,   null, (PointStyle)   null, null);
-    Polygon pgon = new Polygon(mapPoses, null, (PolygonStyle) null, null);
+    Point   pt   = null; PointStyle   ptS   = null;
+    Polygon pgon = null; PolygonStyle pgonS = null;
+    if (doSavePoint) { pt   = new Point  (centre,   null, ptS, null);   }
+    if (doSavePoly)  { pgon = new Polygon(mapPoses, null, pgonS, null); }
 
     // Put geometry in a list
     ArrayList geoList = new ArrayList();
-    geoList.add(pt);
-    geoList.add(pgon);
+    if (doSavePoint) geoList.add(pt);
+    if (doSavePoly)  geoList.add(pgon);
 
     // Prepare to save point to archEnt, then attempt to save archEnt. Upon a
     // successful save, update the fields displayed to the user.
     SaveCallback callback = new SaveCallback() {
         onSave(uuid, newRecord) {
-          String msg = "[saveGeometry()] Added geometry: " + geolist;
-          print(msg);
+          setUuid(tabgroup, uuid);
+          saveFieldCallback();
 
-          setFieldValue(refCentre,  pt.  toString());
-          // TODO under what conditions should the points be written? pgons
-          // require at least three vertices. And putting in null MapPos objects
-          // causes toString() to fail.
-          setFieldValue(refCorners, pgon.toString());
+          // toString() doesn't work for Polygons (`pgon`) for some reason
+          if (doSavePoint) setFieldValue(refCentre,  pt.  toString());
+          if (doSavePoly)  setFieldValue(refCorners, pgon.getVertexList() + "");
+
+          showToast(msgSuccess);
         }
     };
     saveArchEnt(currentUuid, archEntType, geoList, null, callback);
