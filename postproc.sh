@@ -2,19 +2,6 @@
 
 cd module
 
-# Disallow users from logging in with a blank dropdown
-string="onClickLoginLogin () {"
-replacement="onClickLoginLogin () {
-  String val = getDropdownItemValue();
-  if (isNull(val)) {
-    String msgTitle = \"Cannot log in\";
-    String msgBody  = \"A user must be selected in order to log in.\";
-    showWarning(msgTitle, msgBody);
-    return;
-  }
-"
-perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
-
 # Make local records work with the search feature
 string="String searchQuery = \"SELECT uuid, response \"+
                        \"  FROM latestNonDeletedArchEntFormattedIdentifiers  \"+
@@ -28,7 +15,7 @@ string="String searchQuery = \"SELECT uuid, response \"+
                        \"OFFSET ? \";"
 replacement="String searchQuery = \"  SELECT uuid, response \"+
                        \"    FROM localRecord \"+
-                       \"   WHERE response LIKE '\"+term+\"'||'%'  \"+
+                       \"   WHERE response LIKE '%'||'\"+term+\"'||'%'  \"+
                        \"ORDER BY uuid DESC \"+
                        \"   LIMIT ? \"+
                        \"  OFFSET ? \";"
@@ -36,7 +23,7 @@ perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
 
 # Make local records work with autosaving
 string="  saveTabGroup(\"Field\");"
-replacement="  saveTabGroup(\"Field\", \"saveFieldCallback()\");"
+replacement="  saveTabGroup(\"Field\", \"saveFieldCallback(); saveFieldGeometry()\");"
 perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
 
 # Make local records work with duplication
@@ -46,6 +33,7 @@ string="onSave(autosaveUuid, autosaveNewRecord) {
 replacement="onSave(autosaveUuid, autosaveNewRecord) {
           setUuid(tabgroup, autosaveUuid);
           saveFieldCallback();
+          saveFieldGeometry();
         }"
 perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
 
@@ -57,5 +45,26 @@ replacement="reallyDeleteField(){
   deleteFieldCallback();"
 perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
 
+# Make module unpack geometry into globals on Field load
+string="loadFieldFrom(String uuid) {
+  String tabgroup = \"Field\";
+  setUuid(tabgroup, uuid);
+  if (isNull(uuid)) return;
+
+  showTabGroup(tabgroup, uuid);
+}"
+replacement="loadFieldFrom(String uuid) {
+  String tabgroup = \"Field\";
+  setUuid(tabgroup, uuid);
+  if (isNull(uuid)) return;
+
+  showTabGroup(tabgroup, uuid, onLoadField);
+}"
+perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
+
+# Make module save geometry correctly
+string="List    geometry        = null;"
+replacement="List    geometry        = packFieldGeometry();"
+perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
 
 rm ui_logic.bsh.original

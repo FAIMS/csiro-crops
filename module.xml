@@ -16,27 +16,17 @@
 
 <Login f="nodata">
   <Login>
-    <User_ID t="dropdown" f="user">
-      <!--Users are disallowed from logging in with a blank dropdown via-->
-      <!--@POSTPROC.-->
-    </User_ID>
-    <Login t="button" l="Main"/>
+    <User_ID b="decimal" t="input"/>
+    <Login t="button"/>
   </Login>
 </Login>
+
 
 <Field>
   <Field>
     <Crop_Type f="id nocertainty">
       <str>
-        <!--TODO:-->
-        <!--  BRIAN:-->
-        <!--    Crop, show annotation if not null, year-->
-        <!--    So we can do Wheat 2016-->
-        <!--    so if annotation, show it with ": annotation"-->
-        <!--    {{if and($1, not($3)) then "$1 "}}{{if and($1, $3) then "$3 "}} let's see what that does-->
-        <!--    basically, if there's no freetext, write vocab-->
-        <!--    if there's freetext, write freetext-->
-        <fmt>{{if and($1, not($3)) then "$1 "}}{{if and($1, $3) then "$3 "}}</fmt>
+        <fmt>{{if $1 then "$1 "}}{{if $2 then "($2) "}}{{if $3 then "$3"}}</fmt>
       </str>
       <opts>
         <opt>Wheat</opt>
@@ -79,20 +69,25 @@
     <Notes f="nocertainty"/>
   </Field>
   <Location>
-    <Record_Centre_of_Paddock t="button"/>
     <Centre_of_Paddock t="input" f="readonly nocertainty"/>
+    <Record_Centre_of_Paddock t="button"/>
     <Hr_Tag t="webview" f="nolabel"/>
     <cols>
-      <col>
-        <Record_NW_Corner_of_Paddock t="button"/>
-        <Record_NE_Corner_of_Paddock t="button"/>
-      </col>
-      <col>
-        <Record_SW_Corner_of_Paddock t="button"/>
-        <Record_SE_Corner_of_Paddock t="button"/>
-      </col>
+      <Corner_1 t="input" f="readonly nocertainty"/>
+      <Corner_2 t="input" f="readonly nocertainty"/>
     </cols>
-    <Corners_of_Paddock t="input" b="string" f="readonly nocertainty"/>
+    <cols>
+      <Corner_3 t="input" f="readonly nocertainty"/>
+      <Corner_4 t="input" f="readonly nocertainty"/>
+    </cols>
+    <cols>
+      <Record_Corner_1 t="button"/>
+      <Record_Corner_2 t="button"/>
+    </cols>
+    <cols>
+      <Record_Corner_3 t="button"/>
+      <Record_Corner_4 t="button"/>
+    </cols>
   </Location>
 </Field>
 
@@ -101,7 +96,6 @@
 /* Keeps the list of records user-specific and improves performance.          */
 /*                                                                            */
 /* TODO: The search query doesn't filter results properly yet.                */
-/* TODO: Ensure that the formatString is correctly applied in search results. */
 /******************************************************************************/
   // Create a table in the database for the user-specific records if one doesn't
   // exist yet.
@@ -147,12 +141,10 @@
 /* Remembers username selected from previous session and automatically logs   */
 /* the user in with it subsequent sessions.                                   */
 /*                                                                            */
-/* TODO: Check for two or more users that their search results are unique.    */
-/*                                                                            */
 /* Requirement source: Email, "Fwd: my contact details"                       */
 /******************************************************************************/
   addOnEvent("Main",              "load",  "acquireUser()");
-  addOnEvent("Login/Login/Login", "click", "savePreviousUser()");
+  addOnEvent("Login/Login/Login", "click", "tryLoggingIn()");
 
   // Load the last user from localSettings if it exists. Otherwise, redirect the
   // user to the Login tab group.
@@ -169,7 +161,8 @@
           showTabGroup(gotoTabGroup);
         } else {
           String userVocabId = result.get(0);
-          selectUser(userVocabId);
+          setFieldValue(key, userVocabId);
+          tryLoggingIn();
         }
 
         dialog.dismiss();
@@ -177,52 +170,65 @@
     });
   }
 
-  savePreviousUser() {
-    String key = "Login/Login/User_ID";
-    String val = getFieldValue(key);
-    insertIntoLocalSettings(key, val);
-  }
+  // TODO: Prevent this from redirecting to Main tabgroup on loginFailure
+  tryLoggingIn() {
+    String refMain   = "Main";
+    String refUserId = "Login/Login/User_ID";
+    String userVocabId = getFieldValue(refUserId);
 
-  selectUser (String userVocabId) {
     String userQ = "SELECT userid,fname,lname,email FROM user " +
                    "WHERE  userid='" + userVocabId + "';";
     FetchCallback callback = new FetchCallback() {
       onFetch(result) {
-        user = new User(
-              result.get(0),
-              result.get(1),
-              result.get(2),
-              result.get(3)
-        );
-        setUser(user);
-        username = result.get(1) + " " + result.get(2);
+        if (isNull(result)) loginFailure();
+        else                loginSuccess(result, userVocabId);
       }
     };
-
     fetchOne(userQ, callback);
+
+    newTab(refMain, true);
+  }
+
+  loginFailure() {
+    String msgTitle = "Cannot log in";
+    String msgBody  = "User ID not valid";
+    showWarning(msgTitle, msgBody);
+  }
+
+  loginSuccess(result, userId) {
+    user = new User(
+          result.get(0),
+          result.get(1),
+          result.get(2),
+          result.get(3)
+    );
+    setUser(user);
+
+    String key = "Login/Login/User_ID";
+    insertIntoLocalSettings(key, userId);
   }
 
 /************************ SAVING POSITIONS TO ARCHENT *************************/
 /* Requirement source: Email, "Fwd: my contact details"                       */
 /******************************************************************************/
   String c = "click"; // I'm obsessive about an 80-character limit on line width
-  addOnEvent("Field/Location/Record_Centre_of_Paddock",    c, "saveCentre()");
-  addOnEvent("Field/Location/Record_NW_Corner_of_Paddock", c, "saveNwCorner()");
-  addOnEvent("Field/Location/Record_NE_Corner_of_Paddock", c, "saveNeCorner()");
-  addOnEvent("Field/Location/Record_SW_Corner_of_Paddock", c, "saveSwCorner()");
-  addOnEvent("Field/Location/Record_SE_Corner_of_Paddock", c, "saveSeCorner()");
+  addOnEvent("Field/Location/Record_Centre_of_Paddock", c, "saveCentre()");
+  addOnEvent("Field/Location/Record_Corner_1",          c, "savecorner1()");
+  addOnEvent("Field/Location/Record_Corner_2",          c, "savecorner2()");
+  addOnEvent("Field/Location/Record_Corner_3",          c, "savecorner3()");
+  addOnEvent("Field/Location/Record_Corner_4",          c, "savecorner4()");
 
   addOnEvent("Main", "show", "initialiseGeometry()");
 
   initialiseGeometry() {
-    global.centre   = null;
-    global.nwCorner = null;
-    global.neCorner = null;
-    global.swCorner = null;
-    global.seCorner = null;
+    global.centre  = null;
+    global.corner1 = null;
+    global.corner2 = null;
+    global.corner3 = null;
+    global.corner4 = null;
   }
 
-  makeMapPos() {
+  makePoint() {
     String msgSuccess = "Point taken";
     String msgFail    = "No GPS signal is present";
 
@@ -235,79 +241,101 @@
     Double lat = pos.getLatitude();
     Double lon = pos.getLongitude();
     MapPos mapPos = new MapPos(lon, lat);
+    Point  pt     = new Point(mapPos, null, (PointStyle) null, null);
 
     showToast(msgSuccess);
-    return mapPos;
+    return pt;
   }
 
-  saveCentre()   { centre   = makeMapPos(); saveGeometry("point"); }
-  saveNwCorner() { nwCorner = makeMapPos(); saveGeometry("poly"); }
-  saveNeCorner() { neCorner = makeMapPos(); saveGeometry("poly"); }
-  saveSwCorner() { swCorner = makeMapPos(); saveGeometry("poly"); }
-  saveSeCorner() { seCorner = makeMapPos(); saveGeometry("poly"); }
+  saveCentre()  { centre  = makePoint(); displayGeometry(); }
+  savecorner1() { corner1 = makePoint(); displayGeometry(); }
+  savecorner2() { corner2 = makePoint(); displayGeometry(); }
+  savecorner3() { corner3 = makePoint(); displayGeometry(); }
+  savecorner4() { corner4 = makePoint(); displayGeometry(); }
 
-  saveGeometry(String geoType) {
-    if (!geoType.equals("point") && !geoType.equals("poly")) {
-      throw new Error();
-    }
+  displayGeometry() {
+    // Inputs to update
+    refCentre  = "Field/Location/Centre_of_Paddock";
+    refCorner1 = "Field/Location/Corner_1";
+    refCorner2 = "Field/Location/Corner_2";
+    refCorner3 = "Field/Location/Corner_3";
+    refCorner4 = "Field/Location/Corner_4";
 
-    // Check if the point and/or the polygon will be savable
-    Boolean doSavePoint = true;
-    Boolean doSavePoly  = true;
-    doSavePoint = doSavePoint && (centre   != null);
-    doSavePoly  = doSavePoly  && (nwCorner != null);
-    doSavePoly  = doSavePoly  && (neCorner != null);
-    doSavePoly  = doSavePoly  && (swCorner != null);
-    doSavePoly  = doSavePoly  && (seCorner != null);
+    // Output geometry to inputs
+    setFieldValue(refCentre,  toString(centre ));
+    setFieldValue(refCorner1, toString(corner1));
+    setFieldValue(refCorner2, toString(corner2));
+    setFieldValue(refCorner3, toString(corner3));
+    setFieldValue(refCorner4, toString(corner4));
+  }
 
-    if (geoType.equals("point") && !doSavePoint) return;
-    if (geoType.equals("poly")  && !doSavePoly)  return;
+  String toString(MapPos mp) {
+    if (mp == null) return "";
 
-    // Cheery message to show user once the entity is saved
-    String msgSuccess = "Geometry saved";
+    double[] coords = mp.toArray();
+    String x = String.valueOf(coords[0]);
+    String y = String.valueOf(coords[1]);
+    String s = "Collected (%s, %s)";
+    s = s.replaceFirst("%s", x);
+    s = s.replaceFirst("%s", y);
+    return s;
+  }
 
-    // Some references we might need to modify
-    String refCentre  = "Field/Location/Centre_of_Paddock";
-    String refCorners = "Field/Location/Corners_of_Paddock";
+  String toString(Point pt) {
+    if (pt == null) return "";
 
-    // Determine/set currentUuid and archEntType
+    return toString(pt.getMapPos());
+  }
+
+  // Puts the geometry into a list, ready for saving to an archent
+  packFieldGeometry() {
+    // Put geometry in a list
+    ArrayList geoList = new ArrayList();
+    geoList.add(centre );
+    geoList.add(corner1);
+    geoList.add(corner2);
+    geoList.add(corner3);
+    geoList.add(corner4);
+
+    return geoList;
+  }
+
+  saveFieldGeometry() {
     String tabgroup    = "Field";
     String archEntType = tabgroup.replaceAll("_", " ");
     String currentUuid = getUuid(tabgroup);
 
-    // Make geometry---a point (centre) and a polygon (corners)
-    List mapPoses = new ArrayList();
-    mapPoses.add(nwCorner);
-    mapPoses.add(neCorner);
-    mapPoses.add(swCorner);
-    mapPoses.add(seCorner);
+    geometry   = packFieldGeometry();
+    attributes = null;
 
-    Point   pt   = null; PointStyle   ptS   = null;
-    Polygon pgon = null; PolygonStyle pgonS = null;
-    if (doSavePoint) { pt   = new Point  (centre,   null, ptS, null);   }
-    if (doSavePoly)  { pgon = new Polygon(mapPoses, null, pgonS, null); }
-
-    // Put geometry in a list
-    ArrayList geoList = new ArrayList();
-    if (doSavePoint) geoList.add(pt);
-    if (doSavePoly)  geoList.add(pgon);
-
-    // Prepare to save point to archEnt, then attempt to save archEnt. Upon a
-    // successful save, update the fields displayed to the user.
-    SaveCallback callback = new SaveCallback() {
-        onSave(uuid, newRecord) {
-          setUuid(tabgroup, uuid);
-          saveFieldCallback();
-
-          // toString() doesn't work for Polygons (`pgon`) for some reason
-          if (doSavePoint) setFieldValue(refCentre,  pt.  toString());
-          if (doSavePoly)  setFieldValue(refCorners, pgon.getVertexList() + "");
-
-          showToast(msgSuccess);
-        }
-    };
-    saveArchEnt(currentUuid, archEntType, geoList, null, callback);
+    saveArchEnt(currentUuid, tabgroup, geometry, attributes);
   }
+
+  // Unpacks geometry of a Field archent to globals. This is set as the callback
+  // to `loadFieldFrom(String uuid)` via @POSTPROC.
+  FetchCallback onLoadField = new FetchCallback() {
+    onFetch(entity) {
+      geoList = entity.getGeometryList();
+
+      valCentre  = getFieldValue("Field/Location/Centre_of_Paddock");
+      valCorner1 = getFieldValue("Field/Location/Corner_1");
+      valCorner2 = getFieldValue("Field/Location/Corner_2");
+      valCorner3 = getFieldValue("Field/Location/Corner_3");
+      valCorner4 = getFieldValue("Field/Location/Corner_4");
+
+      Integer i = 0;
+      if (isNull(valCentre )) global.centre  = null;
+      else                    global.centre  = geoList.get(i++);
+      if (isNull(valCorner1)) global.corner1 = null;
+      else                    global.corner1 = geoList.get(i++);
+      if (isNull(valCorner2)) global.corner2 = null;
+      else                    global.corner2 = geoList.get(i++);
+      if (isNull(valCorner3)) global.corner3 = null;
+      else                    global.corner3 = geoList.get(i++);
+      if (isNull(valCorner4)) global.corner4 = null;
+      else                    global.corner4 = geoList.get(i++);
+    }
+  };
 
 /************************ DRAW A PRETTY HR TAG IN HTML ************************/
   String ref  = "Field/Location/Hr_Tag";
