@@ -57,6 +57,12 @@ replacement="loadFieldFrom(String uuid) {
   setUuid(tabgroup, uuid);
   if (isNull(uuid)) return;
 
+  FetchCallback onLoadField = new FetchCallback() {
+    onFetch(entity) {
+      geoList = entity.getGeometryList();
+      unpackFieldGeometry(geoList);
+    }
+  };
   showTabGroup(tabgroup, uuid, onLoadField);
 }"
 perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
