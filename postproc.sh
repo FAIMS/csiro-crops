@@ -23,7 +23,7 @@ perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
 
 # Make local records work with autosaving
 string="  saveTabGroup(\"Field\");"
-replacement="  saveTabGroup(\"Field\", \"saveFieldCallback(); saveFieldGeometry()\");"
+replacement="  saveTabGroup(\"Field\", \"saveFieldCallback();\");"
 perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
 
 # Make local records work with duplication
@@ -33,7 +33,6 @@ string="onSave(autosaveUuid, autosaveNewRecord) {
 replacement="onSave(autosaveUuid, autosaveNewRecord) {
           setUuid(tabgroup, autosaveUuid);
           saveFieldCallback();
-          saveFieldGeometry();
         }"
 perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
 
@@ -66,5 +65,9 @@ perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
 string="List    geometry        = null;"
 replacement="List    geometry        = packFieldGeometry();"
 perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
+string="duplicateTabGroup(tabgroup, null"
+replacement="duplicateTabGroup(tabgroup, packFieldGeometry()"
+perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
+
 
 rm ui_logic.bsh.original
