@@ -1,0 +1,103 @@
+<?xml version="1.0"?>
+<dataSchema>
+  <ArchaeologicalElement name="Field">
+    <description/>
+    <property name="Crop Type" isIdentifier="true" type="vocab">
+      <description/>
+      <formatString><![CDATA[{{if $1 then "$1 "}}{{if $2 then "($2) "}}{{if $3 then "$3"}}]]></formatString>
+      <appendCharacterString><![CDATA[ - ]]></appendCharacterString>
+      <lookup>
+        <term>{Wheat}
+<description/></term>
+        <term>{Barley}
+<description/></term>
+        <term>{Oats}
+<description/></term>
+        <term>{Tricicale}
+<description/></term>
+        <term>{Rye}
+<description/></term>
+        <term>{Canola}
+<description/></term>
+        <term>{Lupins}
+<description/></term>
+        <term>{Field_Peas}
+<description/></term>
+        <term>{Chickpeas}
+<description/></term>
+        <term>{Fababeans}
+<description/></term>
+        <term>{Lentils}
+<description/></term>
+        <term>{Vetch}
+<description/></term>
+        <term>{Sunflower}
+<description/></term>
+        <term>{Sorghum}
+<description/></term>
+        <term>{Cotton}
+<description/></term>
+        <term>{Rice}
+<description/></term>
+        <term>{Sown_legume_pasture}
+<description/></term>
+        <term>{Volunteer_pasture}
+<description/></term>
+        <term>{Other}
+<description/></term>
+      </lookup>
+    </property>
+    <property name="Year" isIdentifier="true" type="measure">
+      <description/>
+      <formatString><![CDATA[{{if $1 then $1}}{{if and($1, $2) then " " }}{{if $2 then $2}}{{if $3 then " ($3)"}}{{if between($4,0,0.49) then "??" elsif lessThan($4,1) then "?" }}]]></formatString>
+      <appendCharacterString><![CDATA[ - ]]></appendCharacterString>
+    </property>
+    <property name="Month of Sowing" type="measure">
+      <description/>
+    </property>
+    <property name="Month of Harvest" type="vocab">
+      <description/>
+      <lookup>
+        <term>{March}
+<description/></term>
+        <term>{April}
+<description/></term>
+        <term>{May}
+<description/></term>
+      </lookup>
+    </property>
+    <property name="Enterprise" type="vocab">
+      <description/>
+      <lookup>
+        <term>{Yes}
+<description/></term>
+        <term>{No}
+<description/></term>
+      </lookup>
+    </property>
+    <property name="Photo" type="file" file="true" thumbnail="true">
+      <description/>
+    </property>
+    <property name="Notes" type="measure">
+      <description/>
+    </property>
+    <property name="Centre of Paddock" type="measure">
+      <description/>
+    </property>
+    <property name="Hr Tag">
+      <description/>
+    </property>
+    <property name="Corner 1" type="measure">
+      <description/>
+    </property>
+    <property name="Corner 2" type="measure">
+      <description/>
+    </property>
+    <property name="Corner 3" type="measure">
+      <description/>
+    </property>
+    <property name="Corner 4" type="measure">
+      <description/>
+    </property>
+  </ArchaeologicalElement>
+</dataSchema>

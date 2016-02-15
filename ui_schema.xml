@@ -1,0 +1,293 @@
+<?xml version="1.0"?>
+<h:html xmlns:h="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/2002/xforms" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:jr="http://openrosa.org/javarosa" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <h:head>
+    <h:title>Fill This In</h:title>
+    <model>
+      <instance>
+        <faims id="Fill_This_In">
+          <style>
+            <orientation>
+              <orientation/>
+            </orientation>
+            <even>
+              <layout_weight/>
+            </even>
+            <large>
+              <layout_weight/>
+            </large>
+          </style>
+          <Main>
+            <Main>
+              <Record_Field/>
+              <Logout/>
+            </Main>
+            <Search>
+              <Colgroup_0>
+                <Col_0>
+                  <Search_Term/>
+                </Col_0>
+                <Col_1>
+                  <Search_Button/>
+                </Col_1>
+              </Colgroup_0>
+              <Entity_List/>
+            </Search>
+          </Main>
+          <Login>
+            <Login>
+              <User_ID/>
+              <Login/>
+            </Login>
+          </Login>
+          <Field>
+            <Field>
+              <Crop_Type/>
+              <Year/>
+              <Month_of_Sowing/>
+              <Month_of_Harvest/>
+              <Enterprise/>
+              <Photo/>
+              <Button_Photo/>
+              <Notes/>
+            </Field>
+            <Location>
+              <Centre_of_Paddock/>
+              <Record_Centre_of_Paddock/>
+              <Hr_Tag/>
+              <Colgroup_0>
+                <Col_0>
+                  <Corner_1/>
+                </Col_0>
+                <Col_1>
+                  <Corner_2/>
+                </Col_1>
+              </Colgroup_0>
+              <Colgroup_1>
+                <Col_0>
+                  <Corner_3/>
+                </Col_0>
+                <Col_1>
+                  <Corner_4/>
+                </Col_1>
+              </Colgroup_1>
+              <Colgroup_2>
+                <Col_0>
+                  <Record_Corner_1/>
+                </Col_0>
+                <Col_1>
+                  <Record_Corner_2/>
+                </Col_1>
+              </Colgroup_2>
+              <Colgroup_3>
+                <Col_0>
+                  <Record_Corner_3/>
+                </Col_0>
+                <Col_1>
+                  <Record_Corner_4/>
+                </Col_1>
+              </Colgroup_3>
+            </Location>
+          </Field>
+          <logic/>
+        </faims>
+      </instance>
+      <bind type="decimal" nodeset="/faims/Login/Login/User_ID"/>
+      <bind type="decimal" nodeset="/faims/Field/Field/Year"/>
+      <bind type="date" nodeset="/faims/Field/Field/Month_of_Sowing"/>
+    </model>
+  </h:head>
+  <h:body>
+    <group ref="style">
+      <label/>
+      <group ref="orientation">
+        <label/>
+        <input ref="orientation">
+          <label>horizontal</label>
+        </input>
+      </group>
+      <group ref="even">
+        <label/>
+        <input ref="layout_weight">
+          <label>1</label>
+        </input>
+      </group>
+      <group ref="large">
+        <label/>
+        <input ref="layout_weight">
+          <label>3</label>
+        </input>
+      </group>
+    </group>
+    <group ref="Main">
+      <label>{Main}</label>
+      <group ref="Main">
+        <label>{Main}</label>
+        <trigger ref="Record_Field">
+          <label>{Record_Field}</label>
+        </trigger>
+        <trigger ref="Logout">
+          <label>{Logout}</label>
+        </trigger>
+      </group>
+      <group ref="Search" faims_scrollable="false">
+        <label>{search}</label>
+        <group faims_style="orientation" ref="Colgroup_0">
+          <label/>
+          <group faims_style="even" ref="Col_0">
+            <label/>
+            <input ref="Search_Term">
+              <label>{Search_Term}</label>
+            </input>
+          </group>
+          <group faims_style="large" ref="Col_1">
+            <label/>
+            <trigger ref="Search_Button">
+              <label>{Search}</label>
+            </trigger>
+          </group>
+        </group>
+        <select1 appearance="compact" ref="Entity_List">
+          <label>{Entity_List}</label>
+          <item>
+            <label>Options not loaded</label>
+            <value>Options not loaded</value>
+          </item>
+        </select1>
+      </group>
+    </group>
+    <group ref="Login">
+      <label>{Login}</label>
+      <group ref="Login">
+        <label>{Login}</label>
+        <input ref="User_ID">
+          <label>{User_ID}</label>
+        </input>
+        <trigger ref="Login">
+          <label>{Login}</label>
+        </trigger>
+      </group>
+    </group>
+    <group ref="Field" faims_archent_type="Field">
+      <label>{Field}</label>
+      <group ref="Field">
+        <label>{Field}</label>
+        <select1 faims_attribute_type="vocab" ref="Crop_Type" faims_attribute_name="Crop Type" faims_certainty="false">
+          <label>{Crop_Type}</label>
+          <!--WARNING: No type t was given for this view; assuming it is a dropdown-->
+          <item>
+            <label>Options not loaded</label>
+            <value>0</value>
+          </item>
+        </select1>
+        <input faims_attribute_type="measure" ref="Year" faims_attribute_name="Year" faims_certainty="false">
+          <label>{Year}</label>
+          <!--WARNING: No type t was given for this view; assuming it is an input-->
+        </input>
+        <input faims_attribute_type="measure" ref="Month_of_Sowing" faims_attribute_name="Month of Sowing" faims_certainty="false">
+          <label>{Month_of_Sowing}</label>
+          <!--WARNING: No type t was given for this view; assuming it is an input-->
+        </input>
+        <select1 appearance="full" faims_attribute_type="vocab" ref="Month_of_Harvest" faims_attribute_name="Month of Harvest" faims_certainty="false">
+          <label>{Month_of_Harvest}</label>
+          <item>
+            <label>Options not loaded</label>
+            <value>0</value>
+          </item>
+        </select1>
+        <select1 appearance="full" faims_attribute_type="vocab" ref="Enterprise" faims_attribute_name="Enterprise" faims_certainty="false">
+          <label>{Enterprise}</label>
+          <item>
+            <label>Options not loaded</label>
+            <value>0</value>
+          </item>
+        </select1>
+        <select type="camera" faims_attribute_type="measure" faims_sync="true" ref="Photo" faims_attribute_name="Photo" faims_certainty="false">
+          <label>{Photo}</label>
+          <item>
+            <label>Options not loaded</label>
+            <value>0</value>
+          </item>
+        </select>
+        <trigger ref="Button_Photo">
+          <label>{Button_Photo}</label>
+        </trigger>
+        <input faims_attribute_type="measure" ref="Notes" faims_attribute_name="Notes" faims_certainty="false">
+          <label>{Notes}</label>
+          <!--WARNING: No type t was given for this view; assuming it is an input-->
+        </input>
+      </group>
+      <group ref="Location">
+        <label>{Location}</label>
+        <input faims_attribute_type="measure" ref="Centre_of_Paddock" faims_attribute_name="Centre of Paddock" faims_read_only="true" faims_certainty="false">
+          <label>{Centre_of_Paddock}</label>
+        </input>
+        <trigger ref="Record_Centre_of_Paddock">
+          <label>{Record_Centre_of_Paddock}</label>
+        </trigger>
+        <input faims_web="true" ref="Hr_Tag">
+          <label/>
+        </input>
+        <group ref="Colgroup_0" faims_style="orientation">
+          <label/>
+          <group ref="Col_0" faims_style="even">
+            <label/>
+            <input faims_attribute_type="measure" ref="Corner_1" faims_attribute_name="Corner 1" faims_read_only="true" faims_certainty="false">
+              <label>{Corner_1}</label>
+            </input>
+          </group>
+          <group ref="Col_1" faims_style="even">
+            <label/>
+            <input faims_attribute_type="measure" ref="Corner_2" faims_attribute_name="Corner 2" faims_read_only="true" faims_certainty="false">
+              <label>{Corner_2}</label>
+            </input>
+          </group>
+        </group>
+        <group ref="Colgroup_1" faims_style="orientation">
+          <label/>
+          <group ref="Col_0" faims_style="even">
+            <label/>
+            <input faims_attribute_type="measure" ref="Corner_3" faims_attribute_name="Corner 3" faims_read_only="true" faims_certainty="false">
+              <label>{Corner_3}</label>
+            </input>
+          </group>
+          <group ref="Col_1" faims_style="even">
+            <label/>
+            <input faims_attribute_type="measure" ref="Corner_4" faims_attribute_name="Corner 4" faims_read_only="true" faims_certainty="false">
+              <label>{Corner_4}</label>
+            </input>
+          </group>
+        </group>
+        <group ref="Colgroup_2" faims_style="orientation">
+          <label/>
+          <group ref="Col_0" faims_style="even">
+            <label/>
+            <trigger ref="Record_Corner_1">
+              <label>{Record_Corner_1}</label>
+            </trigger>
+          </group>
+          <group ref="Col_1" faims_style="even">
+            <label/>
+            <trigger ref="Record_Corner_2">
+              <label>{Record_Corner_2}</label>
+            </trigger>
+          </group>
+        </group>
+        <group ref="Colgroup_3" faims_style="orientation">
+          <label/>
+          <group ref="Col_0" faims_style="even">
+            <label/>
+            <trigger ref="Record_Corner_3">
+              <label>{Record_Corner_3}</label>
+            </trigger>
+          </group>
+          <group ref="Col_1" faims_style="even">
+            <label/>
+            <trigger ref="Record_Corner_4">
+              <label>{Record_Corner_4}</label>
+            </trigger>
+          </group>
+        </group>
+      </group>
+    </group>
+  </h:body>
+</h:html>
