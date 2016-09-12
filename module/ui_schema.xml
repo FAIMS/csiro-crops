@@ -18,6 +18,7 @@
           </style>
           <Main>
             <Main>
+              <Webview/>
               <User_Name/>
               <Login/>
               <Signup/>
@@ -116,6 +117,9 @@
       <label>{Main}</label>
       <group ref="Main">
         <label>{Main}</label>
+        <input faims_web="true" ref="Webview">
+          <label>{The_user_account_which_was_used_to_create_this_module_cannot_be_used_to_log_in_}</label>
+        </input>
         <select1 ref="User_Name">
           <label>{User_Name}</label>
           <item>

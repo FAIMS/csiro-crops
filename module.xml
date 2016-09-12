@@ -4,6 +4,10 @@
 
 <Main f="nodata">
   <Main>
+    <Webview t="webview">
+      The user account which was used to create this module cannot be used to
+      log in.
+    </Webview>
     <User_Name t="dropdown" f="user"/>
     <Login t="button"/>
     <Signup t="button"/>
