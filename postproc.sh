@@ -21,11 +21,6 @@ replacement="String searchQuery = \"  SELECT uuid, response \"+
                        \"  OFFSET ? \";"
 perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
 
-# Make local records work with autosaving
-string="  saveTabGroup(\"Field\");"
-replacement="  saveTabGroup(\"Field\", \"saveFieldCallback();\");"
-perl -0777 -i.original -pe "s/\\Q$string/$replacement/igs" ui_logic.bsh
-
 # Make local records work with duplication
 string="onSave(autosaveUuid, autosaveNewRecord) {
           setUuid(tabgroup, autosaveUuid);

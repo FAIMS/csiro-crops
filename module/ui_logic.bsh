@@ -2,7 +2,10 @@ import android.util.Log;
 
 Object dialog;          // Used to help coordinate the display of a "busy..." dialog
 String parentTabgroup;  // Used to allow entities to be saved as children
+String parentTabgroup__;// Used to allow entities to be saved as children
 String redirectTab;     // makes newTab work as expected
+String username = "";
+String userid   = "";
 
 setFileSyncEnabled(true);
 setSyncDelay(5.0f);
@@ -10,6 +13,21 @@ setSyncEnabled(true);
 setSyncMaxInterval(600.0f);
 setSyncMinInterval(5.0f);
 
+/*********************** REGEX-FREE STRING REPLACEMENT ************************/
+replaceFirst(haystack, needle, replacement) {
+  i = haystack.indexOf(needle);
+  if (i == -1)           return haystack;
+  if (needle.equals("")) return haystack;
+  pre  = haystack.substring(0, i                                   );
+  post = haystack.substring(   i+needle.length(), haystack.length());
+  return pre + replacement + post;
+}
+
+replaceFirst(haystack, replacement) {
+  return replaceFirst(haystack, "%s", replacement);
+}
+
+/******************************* LOCALSETTINGS ********************************/
 makeLocalID(){
   fetchOne("CREATE TABLE IF NOT EXISTS localSettings (key text primary key, value text);", null);
   fetchOne("DROP VIEW IF EXISTS parentchild;", null);
@@ -29,6 +47,11 @@ makeLocalID(){
 }
 makeLocalID();
 
+insertIntoLocalSettings(String ref) {
+  String val = getFieldValue(ref);
+  insertIntoLocalSettings(ref, val);
+}
+
 insertIntoLocalSettings(String key, String val) {
   fetchOne("REPLACE INTO localSettings(key, value) VALUES('" + key + "', '" + val + "');");
 }
@@ -37,7 +60,23 @@ insertIntoLocalSettings(String key, Integer val) {
   insertIntoLocalSettings(key, Integer.toString(val));
 }
 
-setFieldValueFromLocalSettings(String key, String ref) {
+insertIntoLocalSettingsOnChange(String ref) {
+  String val = getFieldValue(ref);
+
+  String insertCallback  = "";
+  insertCallback += "insertIntoLocalSettings(\"{key}\")";
+  insertCallback  = replaceFirst(insertCallback, "{key}", ref);
+
+  addOnEvent(ref, "blur",  insertCallback);
+  addOnEvent(ref, "click", insertCallback);
+}
+
+setFieldValueFromLocalSettings(String key, String ref, boolean doOverwrite) {
+  String val = getFieldValue(ref);
+  if (!isNull(val) && !doOverwrite) {
+    return;
+  }
+
   String q = "SELECT value FROM localSettings WHERE key = '" + key + "';";
   fetchOne(q, new FetchCallback() {
     onFetch(result) {
@@ -46,6 +85,98 @@ setFieldValueFromLocalSettings(String key, String ref) {
       }
     }
   });
+}
+
+setFieldValueFromLocalSettings(String ref, boolean doOverwrite) {
+  setFieldValueFromLocalSettings(ref, ref, doOverwrite);
+}
+
+setFieldValueFromLocalSettings(String ref) {
+  setFieldValueFromLocalSettings(ref, false);
+}
+
+setFieldValueFromLocalSettingsOnShow(String ref, boolean doOverwrite) {
+  String cb = "setFieldValueFromLocalSettings(\"%s\", %s)";
+  cb = replaceFirst(cb, ref);
+  cb = replaceFirst(cb, doOverwrite + "");
+
+  addOnEvent(ref, "show", cb);
+}
+
+setFieldValueFromLocalSettingsOnShow(String ref) {
+  boolean doOverwrite = false;
+  setFieldValueFromLocalSettingsOnShow(ref, doOverwrite);
+}
+
+/* Causes the value of the field given by `ref` to be saved each time it is
+ * modified (on blur). The value of the field is restored when the tab group
+ * containing the field is displayed.
+ *
+ * This function depends on `addOnEvent`. Therefore this function must be called
+ * after `addOnEvent` is defined, but before `bindOnEvents` is called. This will
+ * be so if the call is made in the autogenerator's `logic` tags.
+ */
+persistOverSessions(String ref) {
+  setFieldValueFromLocalSettingsOnShow(ref);
+  insertIntoLocalSettingsOnChange     (ref);
+}
+
+/**************************** FIELD COPYING HELPER ****************************/
+/* Provides an easy way to copy field values, even between vocabs.            */
+/******************************************************************************/
+copyFieldValue(src, dst) {
+  Boolean doFindVocabId = true;
+  copyFieldValue(src, dst, doFindVocabId);
+}
+
+/* `src`           The ref of the source field.
+ * `dst`           The ref of the destination field.
+ * `doFindVocabId` If this is true, and the properties/attributes of `src` and
+ *                 `dst` are different, `copyFieldValue` treats `src` and `dst`
+ *                 as if they were menus. Therefore, to copy the value seen by
+ *                 the user (i.e. the vocabName of `src`), a database query is
+ *                 performed. The query determines the which vocabId of `dst`
+ *                 will make it display the same vocabName as `src`.
+ *
+ *                 If `doFindVocabId` is false, the value returned by
+ *                 `getFieldValue` is copied, without any database accesses.
+ */
+copyFieldValue(src, dst, doFindVocabId) {
+  String vocabIdSrc   = getFieldValue(src);
+  String vocabNameSrc = getFieldValue(src, true);
+
+  String attrNameSrc = getAttributeName(src);
+  String attrNameDst = getAttributeName(dst);
+
+  if (attrNameSrc.equals(attrNameDst) || !doFindVocabId) {
+    setFieldValue(dst, vocabIdSrc);
+    return;
+  }
+
+  String q = "";
+  q += "    SELECT vocabid";
+  q += "      FROM vocabulary";
+  q += " LEFT JOIN attributekey";
+  q += "     USING (attributeid)";
+  q += "     WHERE attributename = '{attrNameDst}'";
+  q += "       AND vocabname     = '{vocabNameSrc}'";
+  q  = replaceFirst(q, "{attrNameDst}",  attrNameDst);
+  q  = replaceFirst(q, "{vocabNameSrc}", vocabNameSrc);
+
+
+  FetchCallback populate = new FetchCallback() {
+    onFetch(result) {
+      if (result == null) {
+        // Fall back to dumb field copying
+        copyFieldValue(src, dst, false);
+      }
+
+      String vocabIdDst = result.get(0);
+      setFieldValue(dst, vocabIdDst);
+    }
+  };
+
+  fetchOne(q, populate);
 }
 
 newTab(String tab, Boolean resolveTabGroups) {
@@ -67,8 +198,6 @@ newTab(String tab, Boolean resolveTabGroups) {
       String tabgroupString = path[0];
       String tabString      = path[0] + "/" + path[1];
 
-      showWarning(tabString, tabString);
-
       redirectTab = tabString;
       String onShowTabgroup = "if (!isNull(redirectTab)) { newTab(redirectTab); redirectTab = \"\"; }";
       addOnEvent(tabgroupString, "show", onShowTabgroup);
@@ -81,55 +210,276 @@ newTab(String tab, Boolean resolveTabGroups) {
 }
 
 /******************************************************************************/
+/*                           DOCUMENT OBJECT MODEL                            */
+/******************************************************************************/
+String PREVIOUSLY_DISPLAYED_TAB_GROUP = "";
+String CURRENTLY_DISPLAYED_TAB_GROUP  = "";
+
+getTabGroups() {
+  List tabGroups = new ArrayList();
+  tabGroups.add("Main");
+  tabGroups.add("Field");
+
+  return tabGroups;
+}
+
+updateDisplayedTabGroup(String tabGroup) {
+  PREVIOUSLY_DISPLAYED_TAB_GROUP = CURRENTLY_DISPLAYED_TAB_GROUP;
+  CURRENTLY_DISPLAYED_TAB_GROUP  = tabGroup;
+}
+
+getPreviousTabGroup() {
+  return getPreviouslyDisplayedTabGroup();
+}
+
+getPreviouslyDisplayedTabGroup() {
+  return PREVIOUSLY_DISPLAYED_TAB_GROUP;
+}
+
+getDisplayedTabGroup() {
+  return CURRENTLY_DISPLAYED_TAB_GROUP;
+}
+
+isDisplayed(String ref) {
+  return getDisplayedTabGroup().equals(ref);
+}
+
+getTabGroupRef(String fullRef) {
+  Boolean lastPartOnly = false;
+  return getTabGroupRef(fullRef, lastPartOnly);
+}
+
+getTabGroupRef(String fullRef, Boolean lastPartOnly) {
+  if (isNull(fullRef)) {
+    return null;
+  }
+
+  String[] parts = fullRef.split("/");
+
+  if (parts.length < 1) return null;
+  return parts[0];
+}
+
+getTabRef(String fullRef) {
+  Boolean lastPartOnly = false;
+  return getTabRef(fullRef, lastPartOnly);
+}
+
+getTabRef(String fullRef, Boolean lastPartOnly) {
+  if (isNull(fullRef)) {
+    return null;
+  }
+
+  String[] parts = fullRef.split("/");
+
+  if (parts.length < 2) return null;
+  if (lastPartOnly) return                  parts[1];
+  else              return parts[0] + "/" + parts[1];
+}
+
+getLastRefPart(String fullRef) {
+  if (isNull(fullRef)) {
+    return null;
+  }
+
+  String[] parts = fullRef.split("/");
+  return parts[parts.length-1];
+}
+
+getGuiElementRef(String fullRef) {
+  Boolean lastPartOnly = true;
+  return getGuiElementRef(fullRef, lastPartOnly);
+}
+
+getGuiElementRef(String fullRef, Boolean lastPartOnly) {
+  if (isNull(fullRef)) {
+    return null;
+  }
+
+  String[] parts = fullRef.split("/");
+
+  if (parts.length < 3) return null;
+  if (lastPartOnly) return parts[2];
+  else              return fullRef;
+}
+
+getArch16nKey(String ref) {
+  String lastRefPart = getLastRefPart(ref);
+
+  if (isNull(lastRefPart)) return null;
+  else                     return "{" + lastRefPart + "}";
+}
+
+guessArch16nVal(String ref) {
+  String arch16nKey = getArch16nKey(ref);
+
+  if (isNull(arch16nKey)) return "";
+  arch16nKey = arch16nKey.replaceAll("_", " ");
+  arch16nKey = arch16nKey.replaceAll("^\\{", "");
+  arch16nKey = arch16nKey.replaceAll("\\}$", "");
+  return arch16nKey;
+}
+
+getAttributeName(String ref) {
+  String guiElementRef = getGuiElementRef(ref);
+  if (isNull(guiElementRef)) {
+    return null;
+  }
+
+  String attributeName = guiElementRef.replaceAll("_", " ");
+  return attributeName;
+}
+
+getArchEntType(String ref) {
+  String tabGroupRef = getTabGroupRef(ref);
+  if (isNull(tabGroupRef)) {
+    return null;
+  }
+
+  String archEntType = tabGroupRef.replaceAll("_", " ");
+  return archEntType;
+}
+
+/******************************************************************************/
 /*                            BINDING ACCUMULATOR                             */
 /*                                                                            */
-/* Allows onEvent bindings for the same element to accumulate over multiple   */
-/* onEvent calls instead of having later calls override earlier ones.         */
+/* The binding accumulator allows onEvent bindings for the same element to    */
+/* accumulate over multiple onEvent calls instead of having later calls       */
+/* override earlier ones.                                                     */
+/*                                                                            */
+/* It also adds support for a several additional events:                      */
+/*   - "blur" --- This is merely an interface to make code for adding "blur"  */
+/*         events more consistent.                                            */
+/*   - "create" --- Triggered after a record is first created.                */
+/*   - "fetch" --- Triggered after a record is fetched and displayed in a     */
+/*         given tab group.                                                   */
+/*   - "focus" --- This is merely an interface to make code for adding        */
+/*         "focus" events more consistent.                                    */
+/*   - "leave" --- Triggered after a given tab group is navigated away        */
+/*         from. Note that this event cannot be triggered when the FAIMS app  */
+/*         is exited.                                                         */
+/*   - "save" --- Triggered each time a tab group is saved. This includes the */
+/*         first time the tab group is saved as well as subsequent            */
+/*         onSave(String, Boolean) calls.                                     */
+/*                                                                            */
+/* A single call to `bindOnEvents` must occur after all the `addOnEvent` and  */
+/* `delOnEvents` calls. Calling `bindOnEvents` is what actually establishes   */
+/* the bindings once they have been added to the accumulator.                 */
 /******************************************************************************/
-Map events = new HashMap();
-String SEP = Character.toString ((char) 0); // Beanshell is stupid and won't let me write "\0"
+String SEP = Character.toString ((char) 0); // Beanshell won't let me write "\0"
+Map    EVENTS        = new HashMap(); // (ref, event type) -> callback statement
+Set    CUSTOM_EVENTS = new HashSet(); // Events not handled by `onEvent`
+CUSTOM_EVENTS.add("blur");
+CUSTOM_EVENTS.add("create");
+CUSTOM_EVENTS.add("fetch");
+CUSTOM_EVENTS.add("focus");
+CUSTOM_EVENTS.add("leave");
+CUSTOM_EVENTS.add("save");
+
+getKey(String ref, String event) {
+  return ref + SEP + event;
+}
 
 /* Returns the set of statements bound to an element at `ref` and occuring on
  * `event`.
  */
 getStatements(String ref, String event) {
-  String    key = ref + SEP + event;
-  ArrayList val = (ArrayList) events.get(key);
-  if (val == null) {
-    val = new ArrayList();
-    events.put(key, val);
-  }
-  return val;
+  String    key = getKey(ref, event);
+  ArrayList val = (ArrayList) EVENTS.get(key);
+
+  if (val == null) return new ArrayList();
+  else             return val;
 }
 
-addOnEvent(String ref, String event, String statement) {
-  // Calling `remove()` first ensures statement occurs once in the list, at the end.
-  while(getStatements(ref, event).remove(statement));
-  getStatements(ref, event).add(statement);
+addStatement(String ref, String event, String statement) {
+  // In the case that a statement already exists for a given (`ref`, `event`)
+  // pair, writing `val.add(statement);` will be enough to add the extra
+  // statement. This is because `getStatements` returns a reference to a list.
+  // In the case just described, the list is stored in the `EVENTS` map.
+  // However, sometimes `getStatements` returns empty lists which are not stored
+  // in that map. In this case, calling `EVENTS.put` is required.
+
+  String    key = getKey(ref, event);
+  ArrayList val = getStatements(ref, event);
+  val.add(statement);
+  EVENTS.put(key, val);
+}
+
+getStatementsString(String ref, String event) {
+  ArrayList stmts = getStatements(ref, event);
+  String stmtsStr = "";
+  for (String s : stmts) {
+    stmtsStr += s;
+    stmtsStr += "; ";
+  }
+  return stmtsStr;
 }
 
 delOnEvent(String ref, String event, String statement) {
   while(getStatements(ref, event).remove(statement));
 }
 
-bindOnEvent(String ref, String event) {
-  ArrayList stmts = getStatements(ref, event);
-  String stmtsExpr = "";
-  for (String s : stmts) {
-    stmtsExpr += s;
-    stmtsExpr += "; ";
-  }
+addOnEvent(String ref, String event, String statement) {
+  // Calling `delOnEvent()` first ensures statement occurs once in the list, at
+  // the end.
+  delOnEvent  (ref, event, statement);
+  addStatement(ref, event, statement);
+}
 
-  onEvent(ref, event, stmtsExpr);
+bindOnEvent(String ref, String event) {
+  String stmtsStr     = getStatementsString(ref, event);
+  String focusStmtStr = getStatementsString(ref, "focus");
+  String blurStmtStr  = getStatementsString(ref, "blur" );
+
+  if (!CUSTOM_EVENTS.contains(event)) {
+    onEvent(ref, event, stmtsStr);
+  } else if (event.equals("focus")) {
+    onFocus(ref, focusStmtStr, blurStmtStr);
+  } else if (event.equals("blur" )) {
+    onFocus(ref, focusStmtStr, blurStmtStr);
+  } else {
+    ; // Other events are implemented using auto-generated callback functions
+  }
 }
 
 bindOnEvents() {
-  for (String key : events.keySet()) {
+  for (String key : EVENTS.keySet()) {
     refevent = key.split(SEP);
     ref   = refevent[0];
     event = refevent[1];
     bindOnEvent(ref, event);
   }
+}
+
+onLeaveTabGroup() {
+  onLeaveTabGroup(getPreviouslyDisplayedTabGroup());
+}
+
+/* Execute the "leave" event for the tab group at `ref` if a callback for it
+ * exists.
+ */
+onLeaveTabGroup(String ref) {
+  String event    = "leave";
+  String stmtsStr = getStatementsString(ref, event);
+  execute(stmtsStr);
+}
+
+/* Establishes `onEvent` bindings necessary to make the "leave" event work. The
+ * "leave" event is really triggered upon "show" of another tab.
+ */
+for (tg : getTabGroups()) {
+  String ref      = tg;
+  String event    = "show";
+  String callback;
+
+  // Update (previously) displayed tab group
+  callback = "updateDisplayedTabGroup(\"%s\")";
+  callback = replaceFirst(callback, tg);
+  addOnEvent(tg, event, callback);
+
+  // Trigger on leave tab group event
+  callback = "onLeaveTabGroup()";
+  addOnEvent(tg, event, callback);
 }
 
 /******************************************************************************/
@@ -143,7 +493,65 @@ getDropdownItemValue() {
   return dropdownItemValue;
 }
 
+addOnEvent("Main/Main/User_Name", "click", "dropdownItemValue = getFieldValue(\"Main/Main/User_Name\")");
 addOnEvent("Field/Field/Crop_Type", "click", "dropdownItemValue = getFieldValue(\"Field/Field/Crop_Type\")");
+
+/******************************************************************************/
+/*                             MENU VALUE GETTER                              */
+/*                                                                            */
+/* Provides simple ways of getting a menu's vocabname as opposed to the       */
+/* default, which is the vocabid.                                             */
+/******************************************************************************/
+// Map from vocabid to vocabname. Populated by `fetchMenuValues()`.
+Map MENU_VALUES = null;
+
+/*
+ * Initialises `MENU_VALUES` with the (vocabid -> vocabname) mapping of every
+ * menu.
+ */
+fetchMenuValues() {
+  MENU_VALUES = new HashMap();
+
+  String q = "";
+  q += " SELECT vocabid, vocabname";
+  q += " FROM   vocabulary";
+
+  populateHashMap = new FetchCallback() {
+    onFetch(result) {
+      for (row : result) {
+        vocabId   = row.get(0);
+        vocabName = row.get(1);
+        MENU_VALUES.put(vocabId, vocabName);
+      }
+    }
+  };
+
+  fetchAll(q, populateHashMap);
+}
+
+fetchMenuValues();
+
+/* Returns a menu's vocabname, instead of the (counter-intuitive) vocabid.
+ */
+getFieldValue(String ref, Boolean doConvertVocabIds) {
+  if (!doConvertVocabIds) {
+    return getFieldValue(ref);
+  }
+
+  String val       = getFieldValue(ref);
+  String vocabName = MENU_VALUES.get(val);
+
+  if (val       == null) return "";
+  if (vocabName == null) return "";
+  return vocabName;
+}
+
+/* Shorthand for writing getFieldValue(ref, true). This function's use is
+ * discouraged in favour of writing `getFieldValue(ref, true)`.
+ */
+getMenuValue(String ref) {
+  return getFieldValue(ref, true);
+}
 
 /******************************************************************************/
 /*                                 ACTION BAR                                 */
@@ -310,13 +718,48 @@ updateGPSDiagnostics() {
 /*                                 USER LOGIN                                 */
 /******************************************************************************/
 
-// WARNING: This module is missing a login menu
-String userId    = "1";
-String nameFirst = "";
-String nameLast  = "";
-String email     = "";
-User   user      = new User(userId, nameFirst, nameLast, email);
-setUser(user);
+String userMenuPath = "Main/Main/User_Name";
+
+populateListForUsers(){
+  String getNonDeletedUsersQuery = "SELECT userid, fname || ' ' || lname "+
+                                   "  FROM user "+
+                                   " WHERE userdeleted is null;";
+
+  fetchAll(getNonDeletedUsersQuery, new FetchCallback() {
+    onFetch(result) {
+      populateDropDown(userMenuPath, result, true);
+    }
+  });
+}
+
+selectUser () {
+  String userVocabId  = getFieldValue(userMenuPath);
+  if (isNull(userVocabId)) {
+    username = "";
+    userid = "";
+    return;
+  }
+  String userQ        = "SELECT userid,fname,lname,email FROM user " +
+                        "WHERE  userid='" + userVocabId + "';";
+  FetchCallback callback = new FetchCallback() {
+    onFetch(result) {
+      user = new User(
+            result.get(0),
+            result.get(1),
+            result.get(2),
+            result.get(3)
+      );
+      setUser(user);
+      username = result.get(1) + " " + result.get(2);
+      userid   = result.get(0);
+    }
+  };
+
+  fetchOne(userQ, callback);
+}
+
+addOnEvent(userMenuPath, "show",  "populateListForUsers()");
+addOnEvent(userMenuPath, "click", "selectUser()");
 
 
 /******************************************************************************/
@@ -412,12 +855,16 @@ makeVocab(String type, String path, String attrib, List vocabExclusions, String 
           }
           result=filteredVocab;
         }
+        Boolean hasNull =
+                vocabExclusions == null
+            || !vocabExclusions.contains("")
+            && !vocabExclusions.contains(null);
         // print("makeVocab() filtered result: " + result);
         if(type.equals("CheckBoxGroup")) {
           populateCheckBoxGroup(path, result);
         } else if(type.equals("DropDown")) {
           // populateDropDown(path, result);
-          populateDropDown(path, result, true);
+          populateDropDown(path, result, hasNull);
         } else if(type.equals("RadioGroup")) {
           populateRadioGroup(path, result);
         } else if(type.equals("List")) {
@@ -505,7 +952,7 @@ validateFields(List fields, String format) {
 /******************************************************************************/
 /*                                 AUTOSAVING                                 */
 /******************************************************************************/
-Map tabgroupToUuid = new HashMap();
+Map tabgroupToUuid = Collections.synchronizedMap(new HashMap());
 
 getUuid(String tabgroup) {
   tabgroupToUuid.get(tabgroup);
@@ -520,90 +967,109 @@ saveTabGroup(String tabgroup) {
 }
 
 saveTabGroup(String tabgroup, String callback) {
-  Boolean enableAutosave  = true;
-  String  id              = getUuid(tabgroup);
-  List    geometry        = packFieldGeometry();
-  List    attributes      = null;
-  String  parentTabgroup_ = parentTabgroup;
+  Boolean enableAutosave      = true;
+  String  id                  = getUuid(tabgroup);
+  List    geometry            = null;
+  List    attributes          = null;
+  String  parentTabgroup_     = parentTabgroup;
+  String  parentTabgroupUuid_ = getUuid(parentTabgroup_);
+  Boolean userWasSet          = !username.equals("");
+
+  String repopulateEntityList;
+  repopulateEntityList = "populateEntityListsInTabGroup(\"{tabGroup}\")";
+  repopulateEntityList = replaceFirst(repopulateEntityList, "{tabGroup}", parentTabgroup__);
+
+  callback = repopulateEntityList + ";" + callback;
 
   parentTabgroup = null;
+
   SaveCallback saveCallback  = new SaveCallback() {
     onSave(uuid, newRecord) {
       setUuid(tabgroup, uuid);
-      populateAuthorAndTimestamp(tabgroup);
-      if (newRecord && !isNull(parentTabgroup_)) {
+      // Make a child-parent relationship if need be.
+      if (
+          newRecord &&
+          !isNull(parentTabgroup_) &&
+          !isNull(parentTabgroupUuid_)
+      ) {
         String rel = "";
         rel += parentTabgroup_.replaceAll("_", " ");
         rel += " - ";
         rel += tabgroup.replaceAll("_", " ");
         saveEntitiesToHierRel(
           rel,
-          getUuid(parentTabgroup_),
+          parentTabgroupUuid_,
           uuid,
           "Parent Of",
           "Child Of",
-          null
+          callback
         );
+      } else {
+        execute(callback);
       }
-      execute(callback);
+
+      // This fixes an interesting bug. Without this, if a user was not set
+      // (by calling `setUser`) at the time `saveTabGroup` was first called, but
+      // set by the time `onSave` was called, the tab group is saved correctly
+      // the first time only.
+      //
+      // Adding this allows subsequent saves to succeed. Presumably it plays
+      // some role in helping FAIMS associate the correct user with a record.
+      if (!userWasSet) {
+        saveTabGroup(tabgroup, callback);
+      }
+
     }
     onError(message) {
       showToast(message);
     }
   };
 
-  populateAuthorAndTimestamp(tabgroup);
   saveTabGroup(tabgroup, id, geometry, attributes, saveCallback, enableAutosave);
+}
+
+getTimestampNow() {
+  fmt = "yyyy-MM-dd HH:mm:ssZ";
+  return getTimestampNow(fmt);
+}
+
+getTimestampNow(String fmt) {
+  date    = new Date();
+  dateFmt = new java.text.SimpleDateFormat(fmt);
+  dateStr = dateFmt.format(date);
+
+  // Insert colon into timezone (e.g. +1000 -> +10:00)
+  String left; String right;
+
+  left    = dateStr.substring(0, dateStr.length() - 2);
+  right   = dateStr.substring(   dateStr.length() - 2);
+  dateStr = left + ":" + right;
+
+  return dateStr;
 }
 
 populateAuthorAndTimestamp(String tabgroup) {
   Map tabgroupToAuthor    = new HashMap();
   Map tabgroupToTimestamp = new HashMap();
 
-  String uuid          = getUuid(tabgroup);
   String authorPath    = tabgroupToAuthor.get(tabgroup);
   String timestampPath = tabgroupToTimestamp.get(tabgroup);
-  if (isNull(uuid)) {
-    if (!isNull(authorPath))
-      setFieldValue(authorPath,    "Entity not yet saved");
-    if (!isNull(timestampPath))
-      setFieldValue(timestampPath, "Entity not yet saved");
-    return;
-  }
 
-  String q = "SELECT createdat, createdby " +
-             "  FROM createdmodifiedatby " +
-             " WHERE uuid = '" + uuid + "'";
-  FetchCallback callback = new FetchCallback() {
-    onFetch(result) {
-      if (!isNull(timestampPath))
-        setFieldValue(timestampPath, result.get(0));
-      if (!isNull(authorPath))
-        setFieldValue(authorPath,    result.get(1));
-    }
-  };
+  String authorVal    = username;
+  String timestampVal = getTimestampNow();
 
-  fetchOne(q, callback);
+  if (!isNull(authorPath))    setFieldValue(authorPath,    authorVal);
+  if (!isNull(timestampPath)) setFieldValue(timestampPath, timestampVal);
 }
 
 onShowField () {
   // TODO: Add some things which should happen when this tabgroup is shown
-  saveTabGroup("Field", "saveFieldCallback();");
+  saveTabGroup("Field", "onSaveField__()");
 }
 
 addOnEvent("Field", "show", "onShowField()");
 
-onClickMainRecordField () {
-  // TODO: Add some things which should happen when this element is clicked
-  newField();
-}
-onClickMainLogout () {
-  // TODO: Add some things which should happen when this element is clicked
-  newTab("Login", true);
-}
 
-addOnEvent("Main/Main/Record_Field", "click", "onClickMainRecordField()");
-addOnEvent("Main/Main/Logout", "click", "onClickMainLogout()");
 
 
 /******************************************************************************/
@@ -630,7 +1096,7 @@ addNavigationButtons(String tabgroup) {
       "{New}";
     }
     actionOn() {
-      if(!isNull(getUuid(tabgroup))) {
+      if(isNull(getUuid(tabgroup))) {
           newRecord(tabgroup);
           showToast("{New_record_created}");
       } else {
@@ -822,7 +1288,39 @@ newField(){
 
   setUuid(tabgroup, null);
   newTabGroup(tabgroup);
+  populateAuthorAndTimestamp(tabgroup);
+  populateEntityListsInTabGroup(tabgroup);
+  onCreateField__();
 
+  // WARNING: The default behaviour of calling `onCreateField()` upon entity creation is deprecated in this version of FAIMS Tools. If you never implemented this function, this warning can safely be ignored.
+}
+
+
+onCreateField__(){
+  String ref      = "Field";
+  String event    = "create";
+  String stmtsStr = getStatementsString(ref, event);
+  execute(stmtsStr);
+}
+
+
+
+// Triggered after an existing record is loaded.
+onFetchField__(){
+  String ref      = "Field";
+  String event    = "fetch";
+  String stmtsStr = getStatementsString(ref, event);
+  execute(stmtsStr);
+}
+
+
+
+// Triggered after an existing record is saved.
+onSaveField__(){
+  String ref      = "Field";
+  String event    = "save";
+  String stmtsStr = getStatementsString(ref, event);
+  execute(stmtsStr);
 }
 
 duplicateField(){
@@ -831,6 +1329,8 @@ duplicateField(){
 
   disableAutoSave(tabgroup);
 
+
+  clearGpsInTabGroup(tabgroup);
 
   populateCameraPictureGallery("Field/Field/Photo", new ArrayList());
 
@@ -893,7 +1393,6 @@ doNotDelete(){
   showToast("{Delete_Cancelled}");
 }
 addOnEvent("Main", "show", "removeNavigationButtons()");
-addOnEvent("Login", "show", "removeNavigationButtons()");
 addOnEvent("Field", "show", "addNavigationButtons(\"Field\")");
 
 /******************************************************************************/
@@ -934,15 +1433,150 @@ loadFieldFrom(String uuid) {
   setUuid(tabgroup, uuid);
   if (isNull(uuid)) return;
 
-  FetchCallback onLoadField = new FetchCallback() {
-    onFetch(entity) {
-      geoList = entity.getGeometryList();
-      unpackFieldGeometry(geoList);
+  FetchCallback cb = new FetchCallback() {
+    onFetch(result) {
+      populateEntityListsInTabGroup(tabgroup);
+      // WARNING: The default behaviour of calling `onFetchField()` upon fetching an entity is deprecated in this version of FAIMS Tools. If you never implemented this function, this warning can safely be ignored.
+      onFetchField__();
     }
   };
-  showTabGroup(tabgroup, uuid, onLoadField);
+
+  showTabGroup(tabgroup, uuid, cb);
 }
 
+
+/******************************************************************************/
+/*                          TAKE FROM GPS BUTTON(S)                           */
+/******************************************************************************/
+
+clearGpsInTabGroup(String tabgroup) {
+  Map tabgroupToTabRef = new HashMap();
+
+
+  String tabRef = tabgroupToTabRef.get(tabgroup);
+  if (isNull(tabRef)) return;
+
+  clearGpsInTab(tabRef);
+}
+
+clearGpsInTab(String tabRef) {
+  setFieldValue(tabRef + "Accuracy"  , "");
+  setFieldValue(tabRef + "Latitude"  , "");
+  setFieldValue(tabRef + "Longitude" , "");
+  setFieldValue(tabRef + "Easting"   , "");
+  setFieldValue(tabRef + "Northing"  , "");
+}
+
+/******************************************************************************/
+/*                POPULATION OF ENTITY AND CHILD ENTITY LISTS                 */
+/******************************************************************************/
+/*
+ * `viewType`   the type of GUI element to be populated. It can either equal
+ *              "DropDown" or "List".
+ * `path`       the reference of the GUI element to be populated.
+ * `parentUuid` the parent in the relationship denoted by `relType`.
+ * `entType`    the type of the entities the menu will be populated with.
+ * `relType`    the name of the relationship the children are to be in with the
+ *              entity denoted by `parentUuid`.
+ */
+populateMenuWithEntities (
+  String viewType,
+  String path,
+  String parentUuid,
+  String entType,
+  String relType
+) {
+  String getChildEntitiesQ = "" +
+    "SELECT childuuid, response "+
+    "  FROM parentchild JOIN latestNonDeletedArchEntFormattedIdentifiers ON (childuuid = uuid) " +
+    "  JOIN createdmodifiedatby USING (uuid) " +
+    " WHERE relationshipid IN (SELECT relationshipid  " +
+    "                            FROM latestnondeletedrelationship JOIN relntype USING (relntypeid) " +
+    "                           WHERE relntypename = '"+relType+"') " +
+    "   AND parentuuid = " + parentUuid + " " +
+    "   AND (childaenttypename = '"+entType+"' OR '"+entType+"' = '') " +
+    " ORDER BY createdat DESC ";
+
+  String getEntitiesQ = "" +
+    "SELECT uuid, response "+
+    "  FROM latestNonDeletedArchEntFormattedIdentifiers  "+
+    " WHERE uuid in (SELECT uuid "+
+    "                  FROM latestNonDeletedArchEntIdentifiers "+
+    "                 WHERE aenttypename = '"+entType+"' OR '"+entType+"' = '' " +
+    "               )  "+
+    " ORDER BY response ";
+
+  String q = null;
+  if (relType.equals("")) {
+    q = getEntitiesQ;
+  } else {
+    q = getChildEntitiesQ;
+  }
+
+  FetchCallback cbPopulateDropDown = new FetchCallback() {
+    onFetch(result) {
+      populateDropDown(path, result, true);
+    }
+  };
+
+  switch (viewType) {
+    case "DropDown":
+      fetchAll(q, cbPopulateDropDown);
+      break;
+    case "List":
+      q += " LIMIT ? OFFSET ? ";
+      populateCursorList(path, q, 25);
+      break;
+    default:
+      Log.e("populateMenuWithEntities ", "Unexpected type '" + viewType + "'");
+  }
+}
+
+populateEntityListsInTabGroup(String tabGroup) {
+  if (isNull(tabGroup)) {
+    return;
+  }
+
+  for (m : ENTITY_MENUS) {
+    String path         = m[1];
+    String menuTabGroup = getTabGroupRef(path);
+    String functionCall = getEntityMenuPopulationFunction(m);
+
+    if (menuTabGroup.equals(tabGroup))
+      execute(functionCall);
+  }
+}
+
+getEntityMenuPopulationFunction(String[] menuDescriptor) {
+  String viewType       = menuDescriptor[0];
+  String path           = menuDescriptor[1];
+  String parentUuidCall = menuDescriptor[2];
+  String entType        = menuDescriptor[3];
+  String relType        = menuDescriptor[4];
+
+  String functionCall = "";
+  functionCall += "populateMenuWithEntities(";
+  functionCall += "\"" + viewType       + "\"";
+  functionCall += ", ";
+  functionCall += "\"" + path           + "\"";
+  functionCall += ", ";
+  functionCall +=        parentUuidCall       ;
+  functionCall += ", ";
+  functionCall += "\"" + entType        + "\"";
+  functionCall += ", ";
+  functionCall += "\"" + relType        + "\"";
+  functionCall += ")";
+
+  return functionCall;
+}
+
+ENTITY_MENUS = new ArrayList();
+for (m : ENTITY_MENUS) {
+  String path         = m[1];
+  String functionCall = getEntityMenuPopulationFunction(m);
+
+  execute(functionCall);
+}
 
 /******************************************************************************/
 /*                             HANDWRITTEN LOGIC                              */
@@ -991,92 +1625,94 @@ loadFieldFrom(String uuid) {
     fetchOne(q);
   }
 
+  addOnEvent("Field", "save", "saveFieldCallback()");
+
 /**************************** USERNAME PERSISTENCE ****************************/
 /* Remembers username selected from previous session and automatically logs   */
 /* the user in with it subsequent sessions.                                   */
 /*                                                                            */
 /* Requirement source: Email, "Fwd: my contact details"                       */
 /******************************************************************************/
-  addOnEvent("Main",              "show",  "acquireUser()");
-  addOnEvent("Main/Main/Logout",  "click", "logOut()");
-  addOnEvent("Login/Login/Login", "click", "tryLoggingIn()");
-
-  // Load the last user from localSettings if it exists. Otherwise, redirect the
-  // user to the Login tab group.
-  acquireUser() {
-    String gotoTabGroup = "Login";
-    String key = "Login/Login/User_ID";
-    String q = "SELECT value FROM localSettings WHERE key = '" + key + "';";
-
-    // `dialog` is a global defined by the autogenerator
-    dialog = showBusy("Ensuring you are logged in", "please wait...");
-    fetchOne(q, new FetchCallback() {
-      onFetch(result) {
-        if (isNull(result)) {
-          showTabGroup(gotoTabGroup);
-        } else {
-          String userVocabId = result.get(0);
-          setFieldValue(key, userVocabId);
-          tryLoggingIn();
-        }
-
-        dialog.dismiss();
-      }
-    });
-  }
-
-  // Try loging in using the User_ID entered by the user. If that fails, display
-  // a warning to the user.
-  tryLoggingIn() {
-    String refUserId = "Login/Login/User_ID";
-    String userVocabId = getFieldValue(refUserId);
-
-    String userQ = "SELECT userid,fname,lname,email FROM user " +
-                   "WHERE  userid='" + userVocabId + "';";
-    FetchCallback callback = new FetchCallback() {
-      onFetch(result) {
-        if (isNull(result)) loginFailure();
-        else                loginSuccess(result);
-      }
-    };
-    fetchOne(userQ, callback);
-  }
-
-  loginFailure() {
-    String msgTitle = "Cannot log in";
-    String msgBody  = "User ID not valid";
-    showWarning(msgTitle, msgBody);
-  }
-
-  // 1) Set the user with `setUser()`.
-  // 2) Remember the user so that they can be logged in automatically next time.
-  // 3) Show the Main tab group.
-  loginSuccess(result) {
-    user = new User(
-          result.get(0),
-          result.get(1),
-          result.get(2),
-          result.get(3)
-    );
-    setUser(user);
-
-    String refMain = "Main";
-    String key = "Login/Login/User_ID";
-    String val = user.getUserId();
-    insertIntoLocalSettings(key, val);
-    newTab(refMain, true);
-  }
-
-  logOut() {
-    String key = "Login/Login/User_ID";
-
-    String q = "";
-    q += "DELETE FROM localSettings ";
-    q += "WHERE key = '%s'";
-    q  = q.replaceFirst("%s", key);
-
-    fetchOne(q);
-  }
+//  addOnEvent("Main",              "show",  "acquireUser()");
+//  addOnEvent("Main/Main/Logout",  "click", "logOut()");
+//  addOnEvent("Login/Login/Login", "click", "tryLoggingIn()");
+//
+//  // Load the last user from localSettings if it exists. Otherwise, redirect the
+//  // user to the Login tab group.
+//  acquireUser() {
+//    String gotoTabGroup = "Login";
+//    String key = "Login/Login/User_ID";
+//    String q = "SELECT value FROM localSettings WHERE key = '" + key + "';";
+//
+//    // `dialog` is a global defined by the autogenerator
+//    dialog = showBusy("Ensuring you are logged in", "please wait...");
+//    fetchOne(q, new FetchCallback() {
+//      onFetch(result) {
+//        if (isNull(result)) {
+//          showTabGroup(gotoTabGroup);
+//        } else {
+//          String userVocabId = result.get(0);
+//          setFieldValue(key, userVocabId);
+//          tryLoggingIn();
+//        }
+//
+//        dialog.dismiss();
+//      }
+//    });
+//  }
+//
+//  // Try loging in using the User_ID entered by the user. If that fails, display
+//  // a warning to the user.
+//  tryLoggingIn() {
+//    String refUserId = "Login/Login/User_ID";
+//    String userVocabId = getFieldValue(refUserId);
+//
+//    String userQ = "SELECT userid,fname,lname,email FROM user " +
+//                   "WHERE  userid='" + userVocabId + "';";
+//    FetchCallback callback = new FetchCallback() {
+//      onFetch(result) {
+//        if (isNull(result)) loginFailure();
+//        else                loginSuccess(result);
+//      }
+//    };
+//    fetchOne(userQ, callback);
+//  }
+//
+//  loginFailure() {
+//    String msgTitle = "Cannot log in";
+//    String msgBody  = "User ID not valid";
+//    showWarning(msgTitle, msgBody);
+//  }
+//
+//  // 1) Set the user with `setUser()`.
+//  // 2) Remember the user so that they can be logged in automatically next time.
+//  // 3) Show the Main tab group.
+//  loginSuccess(result) {
+//    user = new User(
+//          result.get(0),
+//          result.get(1),
+//          result.get(2),
+//          result.get(3)
+//    );
+//    setUser(user);
+//
+//    String refMain = "Main";
+//    String key = "Login/Login/User_ID";
+//    String val = user.getUserId();
+//    insertIntoLocalSettings(key, val);
+//    newTab(refMain, true);
+//  }
+//
+//  logOut() {
+//    String key = "Login/Login/User_ID";
+//
+//    String q = "";
+//    q += "DELETE FROM localSettings ";
+//    q += "WHERE key = '%s'";
+//    q  = q.replaceFirst("%s", key);
+//
+//    fetchOne(q);
+//  }
 
 /************************ SAVING POSITIONS TO ARCHENT *************************/
 /* Requirement source: Email, "Fwd: my contact details"                       */
@@ -1205,6 +1841,47 @@ loadFieldFrom(String uuid) {
   String ref  = "Field/Location/Hr_Tag";
   String html = "<hr/>";
   populateWebViewHtml(ref, html);
+
+/********************************* USER LOGIN *********************************/
+// Overrides autogenerated definition
+selectUser () {
+  String userVocabId  = getFieldValue(userMenuPath);
+  if (isNull(userVocabId))
+    return;
+
+  String userQ        = "SELECT userid,fname,lname,email,password FROM user " +
+                        "WHERE  userid='" + userVocabId + "';";
+  FetchCallback callback = new FetchCallback() {
+    onFetch(result) {
+      user = new User(
+            result.get(0),
+            result.get(1),
+            result.get(2),
+            result.get(3),
+            result.get(4)
+      );
+      setUser(user);
+      username = result.get(1) + " " + result.get(2);
+    }
+  };
+
+  fetchOne(userQ, callback);
+}
+
+onClickLogin () {
+  showVerifyUserDialog("doUserLogin()");
+}
+
+onClickSignup () {
+  showCreateUserDialog("populateListForUsers()");
+}
+
+doUserLogin () {
+  newTab("Field", true);
+}
+
+addOnEvent("Main/Main/Login",  "click", "onClickLogin()");
+addOnEvent("Main/Main/Signup", "click", "onClickSignup()");
 
 /******************************************************************************/
 /*                                    INIT                                    */

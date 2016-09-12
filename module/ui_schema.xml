@@ -18,8 +18,9 @@
           </style>
           <Main>
             <Main>
-              <Record_Field/>
-              <Logout/>
+              <User_Name/>
+              <Login/>
+              <Signup/>
             </Main>
             <Search>
               <Colgroup_0>
@@ -33,12 +34,6 @@
               <Entity_List/>
             </Search>
           </Main>
-          <Login>
-            <Login>
-              <User_ID/>
-              <Login/>
-            </Login>
-          </Login>
           <Field>
             <Field>
               <Crop_Type/>
@@ -91,7 +86,6 @@
           <logic/>
         </faims>
       </instance>
-      <bind type="decimal" nodeset="/faims/Login/Login/User_ID"/>
       <bind type="decimal" nodeset="/faims/Field/Field/Year"/>
       <bind type="date" nodeset="/faims/Field/Field/Month_of_Sowing"/>
     </model>
@@ -122,11 +116,18 @@
       <label>{Main}</label>
       <group ref="Main">
         <label>{Main}</label>
-        <trigger ref="Record_Field">
-          <label>{Record_Field}</label>
+        <select1 ref="User_Name">
+          <label>{User_Name}</label>
+          <item>
+            <label>Options not loaded</label>
+            <value>0</value>
+          </item>
+        </select1>
+        <trigger ref="Login">
+          <label>{Login}</label>
         </trigger>
-        <trigger ref="Logout">
-          <label>{Logout}</label>
+        <trigger ref="Signup">
+          <label>{Signup}</label>
         </trigger>
       </group>
       <group ref="Search" faims_scrollable="false">
@@ -153,18 +154,6 @@
             <value>Options not loaded</value>
           </item>
         </select1>
-      </group>
-    </group>
-    <group ref="Login">
-      <label>{Login}</label>
-      <group ref="Login">
-        <label>{Login}</label>
-        <input ref="User_ID">
-          <label>{User_ID}</label>
-        </input>
-        <trigger ref="Login">
-          <label>{Login}</label>
-        </trigger>
       </group>
     </group>
     <group ref="Field" faims_archent_type="Field">
