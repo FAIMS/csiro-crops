@@ -4,8 +4,12 @@
 
 <Main f="nodata">
   <Main>
-    <Record_Field t="button" l="Field"/>
-    <Logout t="button" l="Login"/>
+    <User_Name t="dropdown" f="user"/>
+    <Login t="button"/>
+    <Signup t="button"/>
+
+    <!--<Record_Field t="button" l="Field"/>-->
+    <!--<Logout t="button" l="Login"/>-->
   </Main>
   <search>
     <!--Searching has been modified to include only local records using a-->
@@ -14,12 +18,13 @@
   </search>
 </Main>
 
-<Login f="nodata">
-  <Login>
-    <User_ID b="decimal" t="input"/>
-    <Login t="button"/>
-  </Login>
-</Login>
+<!--<Login f="nodata">-->
+  <!--<Login>-->
+    <!--<User_ID b="decimal" t="input"/>-->
+    <!--<Login t="button"/>-->
+    <!--<Signup t="button"/>-->
+  <!--</Login>-->
+<!--</Login>-->
 
 <Field>
   <Field>
@@ -140,86 +145,86 @@
 /*                                                                            */
 /* Requirement source: Email, "Fwd: my contact details"                       */
 /******************************************************************************/
-  addOnEvent("Main",              "show",  "acquireUser()");
-  addOnEvent("Main/Main/Logout",  "click", "logOut()");
-  addOnEvent("Login/Login/Login", "click", "tryLoggingIn()");
-
-  // Load the last user from localSettings if it exists. Otherwise, redirect the
-  // user to the Login tab group.
-  acquireUser() {
-    String gotoTabGroup = "Login";
-    String key = "Login/Login/User_ID";
-    String q = "SELECT value FROM localSettings WHERE key = '" + key + "';";
-
-    // `dialog` is a global defined by the autogenerator
-    dialog = showBusy("Ensuring you are logged in", "please wait...");
-    fetchOne(q, new FetchCallback() {
-      onFetch(result) {
-        if (isNull(result)) {
-          showTabGroup(gotoTabGroup);
-        } else {
-          String userVocabId = result.get(0);
-          setFieldValue(key, userVocabId);
-          tryLoggingIn();
-        }
-
-        dialog.dismiss();
-      }
-    });
-  }
-
-  // Try loging in using the User_ID entered by the user. If that fails, display
-  // a warning to the user.
-  tryLoggingIn() {
-    String refUserId = "Login/Login/User_ID";
-    String userVocabId = getFieldValue(refUserId);
-
-    String userQ = "SELECT userid,fname,lname,email FROM user " +
-                   "WHERE  userid='" + userVocabId + "';";
-    FetchCallback callback = new FetchCallback() {
-      onFetch(result) {
-        if (isNull(result)) loginFailure();
-        else                loginSuccess(result);
-      }
-    };
-    fetchOne(userQ, callback);
-  }
-
-  loginFailure() {
-    String msgTitle = "Cannot log in";
-    String msgBody  = "User ID not valid";
-    showWarning(msgTitle, msgBody);
-  }
-
-  // 1) Set the user with `setUser()`.
-  // 2) Remember the user so that they can be logged in automatically next time.
-  // 3) Show the Main tab group.
-  loginSuccess(result) {
-    user = new User(
-          result.get(0),
-          result.get(1),
-          result.get(2),
-          result.get(3)
-    );
-    setUser(user);
-
-    String refMain = "Main";
-    String key = "Login/Login/User_ID";
-    String val = user.getUserId();
-    insertIntoLocalSettings(key, val);
-    newTab(refMain, true);
-  }
-
-  logOut() {
-    String key = "Login/Login/User_ID";
-
-    String q = "";
-    q += "DELETE FROM localSettings ";
-    q += "WHERE key = '%s'";
-    q  = q.replaceFirst("%s", key);
-
-    fetchOne(q);
-  }
+//  addOnEvent("Main",              "show",  "acquireUser()");
+//  addOnEvent("Main/Main/Logout",  "click", "logOut()");
+//  addOnEvent("Login/Login/Login", "click", "tryLoggingIn()");
+//
+//  // Load the last user from localSettings if it exists. Otherwise, redirect the
+//  // user to the Login tab group.
+//  acquireUser() {
+//    String gotoTabGroup = "Login";
+//    String key = "Login/Login/User_ID";
+//    String q = "SELECT value FROM localSettings WHERE key = '" + key + "';";
+//
+//    // `dialog` is a global defined by the autogenerator
+//    dialog = showBusy("Ensuring you are logged in", "please wait...");
+//    fetchOne(q, new FetchCallback() {
+//      onFetch(result) {
+//        if (isNull(result)) {
+//          showTabGroup(gotoTabGroup);
+//        } else {
+//          String userVocabId = result.get(0);
+//          setFieldValue(key, userVocabId);
+//          tryLoggingIn();
+//        }
+//
+//        dialog.dismiss();
+//      }
+//    });
+//  }
+//
+//  // Try loging in using the User_ID entered by the user. If that fails, display
+//  // a warning to the user.
+//  tryLoggingIn() {
+//    String refUserId = "Login/Login/User_ID";
+//    String userVocabId = getFieldValue(refUserId);
+//
+//    String userQ = "SELECT userid,fname,lname,email FROM user " +
+//                   "WHERE  userid='" + userVocabId + "';";
+//    FetchCallback callback = new FetchCallback() {
+//      onFetch(result) {
+//        if (isNull(result)) loginFailure();
+//        else                loginSuccess(result);
+//      }
+//    };
+//    fetchOne(userQ, callback);
+//  }
+//
+//  loginFailure() {
+//    String msgTitle = "Cannot log in";
+//    String msgBody  = "User ID not valid";
+//    showWarning(msgTitle, msgBody);
+//  }
+//
+//  // 1) Set the user with `setUser()`.
+//  // 2) Remember the user so that they can be logged in automatically next time.
+//  // 3) Show the Main tab group.
+//  loginSuccess(result) {
+//    user = new User(
+//          result.get(0),
+//          result.get(1),
+//          result.get(2),
+//          result.get(3)
+//    );
+//    setUser(user);
+//
+//    String refMain = "Main";
+//    String key = "Login/Login/User_ID";
+//    String val = user.getUserId();
+//    insertIntoLocalSettings(key, val);
+//    newTab(refMain, true);
+//  }
+//
+//  logOut() {
+//    String key = "Login/Login/User_ID";
+//
+//    String q = "";
+//    q += "DELETE FROM localSettings ";
+//    q += "WHERE key = '%s'";
+//    q  = q.replaceFirst("%s", key);
+//
+//    fetchOne(q);
+//  }
 
 /************************ SAVING POSITIONS TO ARCHENT *************************/
 /* Requirement source: Email, "Fwd: my contact details"                       */
@@ -348,6 +353,47 @@
   String ref  = "Field/Location/Hr_Tag";
   String html = "<hr/>";
   populateWebViewHtml(ref, html);
+
+/********************************* USER LOGIN *********************************/
+// Overrides autogenerated definition
+selectUser () {
+  String userVocabId  = getFieldValue(userMenuPath);
+  if (isNull(userVocabId))
+    return;
+
+  String userQ        = "SELECT userid,fname,lname,email,password FROM user " +
+                        "WHERE  userid='" + userVocabId + "';";
+  FetchCallback callback = new FetchCallback() {
+    onFetch(result) {
+      user = new User(
+            result.get(0),
+            result.get(1),
+            result.get(2),
+            result.get(3),
+            result.get(4)
+      );
+      setUser(user);
+      username = result.get(1) + " " + result.get(2);
+    }
+  };
+
+  fetchOne(userQ, callback);
+}
+
+onClickLogin () {
+  showVerifyUserDialog("doUserLogin()");
+}
+
+onClickSignup () {
+  showCreateUserDialog("populateListForUsers()");
+}
+
+doUserLogin () {
+  newTab("Field", true);
+}
+
+addOnEvent("Main/Main/Login",  "click", "onClickLogin()");
+addOnEvent("Main/Main/Signup", "click", "onClickSignup()");
 ]]></logic>
 
 </module>
