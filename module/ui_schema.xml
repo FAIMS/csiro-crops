@@ -18,10 +18,9 @@
           </style>
           <Main>
             <Main>
-              <Webview/>
               <User_Name/>
-              <Login/>
-              <Signup/>
+              <Log_in/>
+              <Sign_up/>
             </Main>
             <Search>
               <Colgroup_0>
@@ -117,9 +116,6 @@
       <label>{Main}</label>
       <group ref="Main">
         <label>{Main}</label>
-        <input faims_web="true" ref="Webview">
-          <label>{The_user_account_which_was_used_to_create_this_module_cannot_be_used_to_log_in_}</label>
-        </input>
         <select1 ref="User_Name">
           <label>{User_Name}</label>
           <item>
@@ -127,11 +123,11 @@
             <value>0</value>
           </item>
         </select1>
-        <trigger ref="Login">
-          <label>{Login}</label>
+        <trigger ref="Log_in">
+          <label>{Log_in}</label>
         </trigger>
-        <trigger ref="Signup">
-          <label>{Signup}</label>
+        <trigger ref="Sign_up">
+          <label>{Sign_up}</label>
         </trigger>
       </group>
       <group ref="Search" faims_scrollable="false">

@@ -4,13 +4,9 @@
 
 <Main f="nodata">
   <Main>
-    <Webview t="webview">
-      The user account which was used to create this module cannot be used to
-      log in.
-    </Webview>
     <User_Name t="dropdown" f="user"/>
-    <Login t="button"/>
-    <Signup t="button"/>
+    <Log_in t="button"/>
+    <Sign_up t="button"/>
   </Main>
   <search>
     <!--Searching has been modified to include only local records using a-->
@@ -300,8 +296,8 @@ doUserLogin () {
   newTab("Field", true);
 }
 
-addOnEvent("Main/Main/Login",  "click", "onClickLogin()");
-addOnEvent("Main/Main/Signup", "click", "onClickSignup()");
+addOnEvent("Main/Main/Log_in",  "click", "onClickLogin()");
+addOnEvent("Main/Main/Sign_up", "click", "onClickSignup()");
 ]]></logic>
 
 </module>
