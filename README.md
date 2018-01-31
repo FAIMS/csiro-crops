@@ -36,8 +36,13 @@ If you have any questions about the module, please contact the FAIMS team at **e
 
 ## Screenshots:
 <p align="left">
-  <img src="xxx" width="250"/>
-  <img src="xxx" width="250"/>
-  <img src="xxx" width="250"/>
+  <img src="https://github.com/FAIMS/csiro-crops/blob/master/screenshots/Screenshot_20170914-190808.png" width="250"/>
+  <img src="https://github.com/FAIMS/csiro-crops/blob/master/screenshots/Screenshot_20170914-190828.png" width="250"/>
+  <img src="https://github.com/FAIMS/csiro-crops/blob/master/screenshots/Screenshot_20170914-190858.png" width="250"/>
 </p>
 
+<p align="left">
+  <img src="https://github.com/FAIMS/csiro-crops/blob/master/screenshots/Screenshot_20170914-190957.png" width="250"/>
+  <img src="https://github.com/FAIMS/csiro-crops/blob/master/screenshots/Screenshot_20170914-191013.png" width="250"/>
+  <img src="https://github.com/FAIMS/csiro-crops/blob/master/screenshots/Screenshot_20170914-191131.png" width="250"/>
+</p>
